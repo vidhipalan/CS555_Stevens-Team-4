@@ -16,6 +16,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+
 // --- connect Mongo ---
 const { MONGODB_URI } = process.env;
 if (!MONGODB_URI) {
@@ -41,6 +42,7 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });
+module.exports = app;
 
 // --- start server ---
 const PORT = process.env.PORT || 5050; // use 5050 since 5000 is busy on your Mac
