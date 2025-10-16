@@ -1,13 +1,13 @@
 // app/(auth)/login.tsx
-import { View, Text, TextInput, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import { API_ENDPOINTS } from '@/constants/config';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, router } from 'expo-router';
-import { API_ENDPOINTS } from '@/constants/config';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import * as SecureStore from 'expo-secure-store';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { z } from 'zod';
 
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -20,23 +20,34 @@ export default function Login() {
   const [serverError, setServerError] = useState<string | null>(null);
   const { register, setValue, handleSubmit, formState: { errors, isSubmitting, isValid } } =
     useForm<FormValues>({ resolver: zodResolver(schema), mode: 'onChange' });
-console.log('API_ENDPOINTS:', API_ENDPOINTS);
-if (!API_ENDPOINTS?.AUTH?.LOGIN || !API_ENDPOINTS.AUTH.LOGIN.startsWith('http')) {
-  setServerError('API URL not set — check constants/config.ts');
-  return;
-}
-console.log('🔎 LOGIN URL =', API_ENDPOINTS.AUTH.LOGIN);
+
+  useEffect(() => {
+    try {
+      console.log('API_ENDPOINTS:', API_ENDPOINTS);
+      if (!API_ENDPOINTS?.AUTH?.LOGIN || !API_ENDPOINTS.AUTH.LOGIN.startsWith('http')) {
+        setServerError('API URL not set — check constants/config.ts');
+      } else {
+        console.log('🔎 LOGIN URL =', API_ENDPOINTS.AUTH.LOGIN);
+      }
+    } catch (e) {
+      setServerError('API configuration error');
+    }
+  }, []);
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
     try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 10000);
       const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(values),
+        signal: controller.signal,
       });
+      clearTimeout(t);
 
       const data = await response.json();
 
@@ -49,14 +60,17 @@ console.log('🔎 LOGIN URL =', API_ENDPOINTS.AUTH.LOGIN);
       await SecureStore.setItemAsync('user_email', values.email);
       router.replace('/(tabs)');
     } catch (e: any) {
-      setServerError(e?.message || 'Something went wrong');
+      if (e?.name === 'AbortError') {
+        setServerError('Request timed out. Check network/API URL.');
+      } else {
+        setServerError(e?.message || 'Something went wrong');
+      }
     }
   };
 
   return (
     <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
-        {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
             <View style={styles.logo}>
@@ -66,8 +80,6 @@ console.log('🔎 LOGIN URL =', API_ENDPOINTS.AUTH.LOGIN);
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue to your account</Text>
         </View>
-
-        {/* Form Section */}
         <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email Address</Text>

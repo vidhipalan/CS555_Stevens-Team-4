@@ -1,9 +1,5 @@
-// API Configuration
-// Use your local IP address instead of localhost for mobile testing
-// To find your IP: Run 'ipconfig' (Windows) or 'ifconfig' (Mac/Linux) in terminal
-export const API_URL = 'http://192.168.1.205:5050';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL as string;
 
-// API Endpoints
 export const API_ENDPOINTS = {
   AUTH: {
     SIGNUP: `${API_URL}/api/auth/signup`,
