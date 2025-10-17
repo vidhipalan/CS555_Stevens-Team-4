@@ -9,7 +9,7 @@ const authMiddleware = (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    req.userId = decoded.id;
+    req.user = { id: decoded.id };
     next();
   } catch (error) {
     res.status(401).json({ error: 'Token is not valid' });
