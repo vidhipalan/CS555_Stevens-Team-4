@@ -2,6 +2,7 @@
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { API_ENDPOINTS } from '@/constants/config';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Picker } from '@react-native-picker/picker';
 import { Link, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useState } from 'react';
@@ -12,6 +13,7 @@ import { z } from 'zod';
 const schema = z.object({
   email: z.string().email('Enter a valid email'),
   password: z.string().min(6, 'Min 6 characters'),
+  role: z.enum(['patient', 'clinician'], { required_error: 'Please select a role' }),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -34,7 +36,7 @@ export default function Signup() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...values, role: 'patient' }),
+        body: JSON.stringify(values),
         signal: controller.signal,
       });
       clearTimeout(t);
@@ -52,9 +54,9 @@ export default function Signup() {
 
       // Route based on role
       if (data.user.role === 'clinician') {
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/dashboard' as any);
       } else {
-        router.replace('/(tabs)');
+        router.replace('/(tabs)' as any);
       }
     } catch (e: any) {
       if (e?.name === 'AbortError') {
@@ -110,6 +112,22 @@ export default function Signup() {
             {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
           </View>
 
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Role</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={undefined}
+                onValueChange={(value) => setValue('role', (value || 'patient') as 'patient' | 'clinician', { shouldValidate: true })}
+                style={styles.picker}
+              >
+                <Picker.Item label="Select your role" value="" />
+                <Picker.Item label="Patient" value="patient" />
+                <Picker.Item label="Clinician" value="clinician" />
+              </Picker>
+            </View>
+            {errors.role && <Text style={styles.error}>{errors.role.message}</Text>}
+          </View>
+
           {serverError && (
             <View style={styles.errorContainer}>
               <Text style={styles.error}>{serverError}</Text>
@@ -136,7 +154,7 @@ export default function Signup() {
 
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Already have an account? </Text>
-            <Link href="/(auth)/login" asChild>
+            <Link href={"/(auth)/login" as any} asChild>
               <Pressable>
                 <Text style={styles.signupLink}>Sign In</Text>
               </Pressable>
@@ -304,5 +322,15 @@ const styles = StyleSheet.create({
     color: '#6366F1',
     fontSize: 15,
     fontWeight: '700',
+  },
+  pickerContainer: {
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 50,
   },
 });

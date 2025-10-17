@@ -21,6 +21,7 @@ export default function RootLayout() {
       if (process.env.EXPO_PUBLIC_FORCE_LOGOUT === '1') {
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('user_email');
+        await SecureStore.deleteItemAsync('user_role');
         setHasToken(false);
         const inAuthGroupNow = segments[0] === '(auth)';
         if (!inAuthGroupNow) router.replace('/(auth)/login');
@@ -28,6 +29,7 @@ export default function RootLayout() {
       }
 
       const token = await SecureStore.getItemAsync('auth_token');
+      const userRole = await SecureStore.getItemAsync('user_role');
       console.log('auth_token:', token); 
       const tokenExists = !!token;
       setHasToken(tokenExists);
@@ -37,7 +39,12 @@ export default function RootLayout() {
       if (!tokenExists && !inAuthGroup) {
         router.replace('/(auth)/login');
       } else if (tokenExists && inAuthGroup) {
-        router.replace('/(tabs)');
+        // Route based on user role
+        if (userRole === 'clinician') {
+          router.replace('/(tabs)/dashboard');
+        } else {
+          router.replace('/(tabs)');
+        }
       }
     };
 

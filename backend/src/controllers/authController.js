@@ -114,3 +114,24 @@ exports.getCurrentUser = async (req, res) => {
     res.status(500).json({ error: 'Error fetching user' });
   }
 };
+
+// @route   GET /api/auth/patients
+// @desc    Get all patients (clinicians only)
+// @access  Private
+exports.getAllPatients = async (req, res) => {
+  try {
+    // Check if requesting user is a clinician
+    const requestingUser = await User.findById(req.user.id);
+    if (!requestingUser || requestingUser.role !== 'clinician') {
+      return res.status(403).json({ error: 'Access denied. Clinicians only.' });
+    }
+
+    // Get all patients
+    const patients = await User.find({ role: 'patient' }).select('-password');
+    
+    res.json(patients);
+  } catch (error) {
+    console.error('Get all patients error:', error);
+    res.status(500).json({ error: 'Error fetching patients' });
+  }
+};
