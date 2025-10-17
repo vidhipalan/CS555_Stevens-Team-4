@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -8,6 +9,17 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadRole = async () => {
+      const role = await SecureStore.getItemAsync('user_role');
+      setUserRole(role);
+    };
+    loadRole();
+  }, []);
+
+  const isClinician = userRole === 'clinician';
 
   return (
     <Tabs
@@ -16,11 +28,22 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
+      {/* Dashboard - Only for clinicians, first tab */}
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Dashboard',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
+          href: isClinician ? '/dashboard' : null,
+        }}
+      />
+      {/* Home - For patients, hidden for clinicians */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          href: !isClinician ? '/' : null,
         }}
       />
       <Tabs.Screen

@@ -19,7 +19,10 @@ export default function Signup() {
   const [secure, setSecure] = useState(true);
   const [serverError, setServerError] = useState<string | null>(null);
   const { register, setValue, handleSubmit, formState: { errors, isSubmitting, isValid } } =
-    useForm<FormValues>({ resolver: zodResolver(schema), mode: 'onChange' });
+    useForm<FormValues>({
+      resolver: zodResolver(schema),
+      mode: 'onChange',
+    });
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -31,7 +34,7 @@ export default function Signup() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, role: 'patient' }),
         signal: controller.signal,
       });
       clearTimeout(t);
@@ -42,10 +45,17 @@ export default function Signup() {
         throw new Error(data.error || 'Signup failed');
       }
 
-      // Save token and email to secure store
+      // Save token, email, and role
       await SecureStore.setItemAsync('auth_token', data.token);
       await SecureStore.setItemAsync('user_email', values.email);
-      router.replace('/(tabs)');
+      await SecureStore.setItemAsync('user_role', data.user.role);
+
+      // Route based on role
+      if (data.user.role === 'clinician') {
+        router.replace('/(tabs)/dashboard');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (e: any) {
       if (e?.name === 'AbortError') {
         setServerError('Request timed out. Check network/API URL.');

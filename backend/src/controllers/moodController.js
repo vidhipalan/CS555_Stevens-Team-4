@@ -65,4 +65,29 @@ exports.getHistory = async (req, res) => {
   }
 };
 
+exports.getAllPatientsMoods = async (req, res) => {
+  try {
+    const User = require('../models/User');
+
+    // Get the requesting user
+    const requestingUser = await User.findById(req.userId);
+    if (!requestingUser || requestingUser.role !== 'clinician') {
+      return res.status(403).json({ error: 'Access denied. Clinicians only.' });
+    }
+
+    const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 100));
+
+    // Get all moods from all users, populate user info
+    const moods = await Mood.find({})
+      .populate('userId', 'email role')
+      .sort({ date: -1, createdAt: -1 })
+      .limit(limit);
+
+    return res.json(moods);
+  } catch (err) {
+    console.error('getAllPatientsMoods error:', err);
+    return res.status(500).json({ error: 'Failed to fetch patient moods' });
+  }
+};
+
 

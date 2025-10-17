@@ -4,7 +4,7 @@ import { API_ENDPOINTS } from '@/constants/config';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { z } from 'zod';
@@ -20,19 +20,6 @@ export default function Login() {
   const [serverError, setServerError] = useState<string | null>(null);
   const { register, setValue, handleSubmit, formState: { errors, isSubmitting, isValid } } =
     useForm<FormValues>({ resolver: zodResolver(schema), mode: 'onChange' });
-
-  useEffect(() => {
-    try {
-      console.log('API_ENDPOINTS:', API_ENDPOINTS);
-      if (!API_ENDPOINTS?.AUTH?.LOGIN || !API_ENDPOINTS.AUTH.LOGIN.startsWith('http')) {
-        setServerError('API URL not set — check constants/config.ts');
-      } else {
-        console.log('🔎 LOGIN URL =', API_ENDPOINTS.AUTH.LOGIN);
-      }
-    } catch (e) {
-      setServerError('API configuration error');
-    }
-  }, []);
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -55,10 +42,17 @@ export default function Login() {
         throw new Error(data.error || 'Login failed');
       }
 
-      // Save token and email to secure store
+      // Save token, email, and role
       await SecureStore.setItemAsync('auth_token', data.token);
       await SecureStore.setItemAsync('user_email', values.email);
-      router.replace('/(tabs)');
+      await SecureStore.setItemAsync('user_role', data.user.role);
+
+      // Route based on role
+      if (data.user.role === 'clinician') {
+        router.replace('/(tabs)/dashboard');
+      } else {
+        router.replace('/(tabs)');
+      }
     } catch (e: any) {
       if (e?.name === 'AbortError') {
         setServerError('Request timed out. Check network/API URL.');

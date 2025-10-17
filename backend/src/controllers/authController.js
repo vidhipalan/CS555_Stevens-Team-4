@@ -13,7 +13,7 @@ const generateToken = (userId) => {
 // @access  Public
 exports.signup = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, role } = req.body;
 
     // Validate input
     if (!email || !password) {
@@ -30,6 +30,7 @@ exports.signup = async (req, res) => {
     const user = await User.create({
       email,
       password,
+      role: role || 'patient', // Default to patient if not provided
     });
 
     // Generate token
@@ -41,10 +42,16 @@ exports.signup = async (req, res) => {
       user: {
         id: user._id,
         email: user.email,
+        role: user.role,
       },
     });
   } catch (error) {
     console.error('Signup error:', error);
+    // Handle mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      return res.status(400).json({ error: messages[0] || 'Validation failed' });
+    }
     res.status(500).json({ error: 'Error creating user' });
   }
 };
@@ -82,6 +89,7 @@ exports.login = async (req, res) => {
       user: {
         id: user._id,
         email: user.email,
+        role: user.role,
       },
     });
   } catch (error) {
