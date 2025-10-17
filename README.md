@@ -1,50 +1,162 @@
-# Welcome to your Expo app 👋
+## 🧠 Mental Health Tracker App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A full-stack mobile and web application designed to support mental wellness through mood tracking, journaling, and secure clinician-patient communication.
 
-## Get started
+## 🚀 Getting Started
 
-1. Install dependencies
+Follow these steps to set up and run the project on your local machine.
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+1. Clone the Repository
 
 ```bash
-npm run reset-project
+git clone https://github.com/vidhipalan/CS555_Stevens-Team-4.git
+cd CS555_Stevens-Team-4
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+2. Backend Setup
 
-## Learn more
+Navigate to the backend directory:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+cd backend
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-## Join the community
+3. Create a .env file in the backend directory and add the following configuration:
 
-Join our community of developers creating universal apps.
+```bash
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# JWT Secret (change this for production)
+JWT_SECRET=your-secret-key-change-this-in-production
+```
+
+4. Install Backend Dependencies
+```bash
+npm install
+```
+
+5. Run the Backend Server
+
+```bash
+npm run dev
+```
+✅ Make sure the terminal shows a message confirming MongoDB connection (e.g., “Connected to MongoDB”).
+
+6. Mobile Setup (Expo)
+   
+Step 1 — Install Expo Go
+
+Download Expo Go on your mobile device:
+
+iOS: https://apps.apple.com/app/expo-go/id982107779
+
+Android: https://play.google.com/store/apps/details?id=host.exp.exponent
+
+Step 2 — Connect Devices on the Same Network
+
+Make sure:
+
+Your mobile phone and computer are on the same Wi-Fi network.
+
+Step 3 — Find Your Local IP Address
+
+Windows:
+
+```bash
+ipconfig
+```
+
+Mac:
+
+```bash
+ifconfig | grep inet
+```
+
+Copy your local IP address (e.g., 192.168.1.10)
+
+7. Frontend Setup (Expo Project)
+
+Open a new terminal window (keep backend running):
+
+```bash
+cd ..
+```
+
+Install Expo CLI and frontend dependencies:
+
+```bash
+npm install expo
+```
+
+8. Run the Frontend App
+
+Start the Expo app using your local IP address (replace <IP address> with your actual one):
+
+```bash
+EXPO_PUBLIC_API_URL="http://<IP address>:5050" npx expo start -c
+```
+
+Example:
+
+EXPO_PUBLIC_API_URL="http://192.168.1.10:5050" npx expo start -c
+
+9. Open the App on Your Mobile
+
+Scan the QR code displayed in your terminal using the Expo Go app.
+
+The app should open and connect to your local backend API.
+
+## ✅ Summary
+
+You should now have:
+
+Backend: running at http://localhost:5050
+
+Frontend: running on your mobile device via Expo, connected to the backend.
+
+## ⚙️ Tech Stack
+
+Frontend: React Native (Expo)
+
+Backend: Node.js + Express.js
+
+Database: MongoDB Atlas
+
+Authentication: JWT (JSON Web Token)
+
+## 🧩 Notes
+
+Run backend and frontend in two separate terminals.
+
+Use your local IP, not localhost, when testing on a mobile device.
+
+Keep your .env file private (do not commit it).
+
+Ensure your MongoDB Atlas allows your IP in Network Access settings.
+
+
+## 🧰 Troubleshooting
+
+1. Expo “Network request failed” Error
+
+Make sure phone and computer are on the same Wi-Fi.
+
+Verify your EXPO_PUBLIC_API_URL.
+
+Try restarting Expo with -c flag to clear cache.
+
+2. MongoDB Connection Error
+
+Check the .env file and MongoDB URI.
+
+Whitelist your IP in MongoDB Atlas under Network Access.
+
+3. QR Code Not Working
+
+Switch Expo mode from Tunnel to LAN.
+
