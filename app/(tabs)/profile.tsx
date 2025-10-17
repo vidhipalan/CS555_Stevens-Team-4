@@ -6,16 +6,21 @@ import { useState, useEffect } from 'react';
 
 export default function ProfileScreen() {
   const [email, setEmail] = useState<string>('');
+  const [role, setRole] = useState<string>('');
 
   useEffect(() => {
-    // Get user email from secure store
-    const getEmail = async () => {
+    // Get user email and role from secure store
+    const getUserInfo = async () => {
       const userEmail = await SecureStore.getItemAsync('user_email');
+      const userRole = await SecureStore.getItemAsync('user_role');
       if (userEmail) {
         setEmail(userEmail);
       }
+      if (userRole) {
+        setRole(userRole);
+      }
     };
-    getEmail();
+    getUserInfo();
   }, []);
 
   const handleLogout = () => {
@@ -33,6 +38,7 @@ export default function ProfileScreen() {
           onPress: async () => {
             await SecureStore.deleteItemAsync('auth_token');
             await SecureStore.deleteItemAsync('user_email');
+            await SecureStore.deleteItemAsync('user_role');
             router.replace('/(auth)/login');
           },
         },
@@ -56,6 +62,18 @@ export default function ProfileScreen() {
         </View>
         <Text style={styles.name}>User Account</Text>
         <Text style={styles.email}>{email || 'user@example.com'}</Text>
+        {role && (
+          <View style={[styles.roleBadge, role === 'clinician' && styles.roleBadgeClinician]}>
+            <IconSymbol
+              name={role === 'clinician' ? 'stethoscope' : 'person'}
+              size={16}
+              color="#fff"
+            />
+            <Text style={styles.roleText}>
+              {role.charAt(0).toUpperCase() + role.slice(1)}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Menu Items */}
@@ -209,6 +227,24 @@ const styles = StyleSheet.create({
   email: {
     fontSize: 16,
     color: '#6B7280',
+    marginBottom: 12,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  roleBadgeClinician: {
+    backgroundColor: '#10B981',
+  },
+  roleText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   menuSection: {
     marginTop: 24,
