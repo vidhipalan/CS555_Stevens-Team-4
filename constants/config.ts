@@ -10,4 +10,8 @@ export const API_ENDPOINTS = {
   MOODS: {
     ALL_PATIENTS: `${API_URL}/api/moods/all-patients`,
   },
+  GRATITUDE: {
+    ENTRIES: `${API_URL}/api/gratitude`,
+    DRAFTS: `${API_URL}/api/gratitude/drafts`,
+  },
 };
