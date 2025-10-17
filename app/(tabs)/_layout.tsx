@@ -49,6 +49,12 @@ export default function TabLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="gratitude"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

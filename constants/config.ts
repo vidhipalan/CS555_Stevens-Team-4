@@ -6,4 +6,8 @@ export const API_ENDPOINTS = {
     LOGIN: `${API_URL}/api/auth/login`,
     ME: `${API_URL}/api/auth/me`,
   },
+  GRATITUDE: {
+    ENTRIES: `${API_URL}/api/gratitude`,
+    DRAFTS: `${API_URL}/api/gratitude/drafts`,
+  },
 };

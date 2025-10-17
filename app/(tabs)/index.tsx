@@ -33,6 +33,13 @@ export default function HomeScreen() {
           <Text style={styles.primaryButtonText}>View Mood History</Text>
         </Pressable>
       </Link>
+
+      <View style={{ height: 12 }} />
+      <Link href={("/(tabs)/gratitude" as unknown as any)} asChild>
+        <Pressable style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Gratitude Journal</Text>
+        </Pressable>
+      </Link>
     </View>
   );
 }

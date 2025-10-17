@@ -32,6 +32,7 @@ app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/moods', require('./routes/moodRoutes'));
+app.use('/api/gratitude', require('./routes/gratitudeRoutes'));
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
