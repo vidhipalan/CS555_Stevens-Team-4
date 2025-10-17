@@ -1,28 +1,24 @@
+import { API_ENDPOINTS } from '@/constants/config';
+import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { API_ENDPOINTS } from '@/constants/config';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
-interface MoodEntry {
+interface Patient {
   _id: string;
-  userId: {
-    email: string;
-    role: string;
-  };
-  mood: string;
-  note: string;
-  date: string;
+  email: string;
+  role: string;
   createdAt: string;
 }
 
 export default function DashboardScreen() {
   const [email, setEmail] = useState<string>('');
-  const [moods, setMoods] = useState<MoodEntry[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchMoods = async () => {
+  const fetchPatients = async () => {
     try {
       const token = await SecureStore.getItemAsync('auth_token');
       if (!token) {
@@ -30,21 +26,21 @@ export default function DashboardScreen() {
         return;
       }
 
-      const response = await fetch(API_ENDPOINTS.MOODS.ALL_PATIENTS, {
+      const response = await fetch(API_ENDPOINTS.AUTH.PATIENTS, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
       if (!response.ok) {
-        throw new Error('Failed to fetch moods');
+        throw new Error('Failed to fetch patients');
       }
 
       const data = await response.json();
-      setMoods(data);
+      setPatients(data);
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'Failed to load moods');
+      setError(err.message || 'Failed to load patients');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -55,27 +51,22 @@ export default function DashboardScreen() {
     const load = async () => {
       const e = await SecureStore.getItemAsync('user_email');
       if (e) setEmail(e);
-      await fetchMoods();
+      await fetchPatients();
     };
     load();
   }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchMoods();
+    fetchPatients();
   };
 
-  const getMoodEmoji = (mood: string) => {
-    const moodMap: { [key: string]: string } = {
-      happy: '😊',
-      neutral: '😐',
-      sad: '😢',
-      angry: '😠',
-      anxious: '😰',
-      excited: '🤩',
-      tired: '😴',
-    };
-    return moodMap[mood] || '😐';
+  const handlePatientPress = (patient: Patient) => {
+    // Navigate to patient detail screen
+    router.push({
+      pathname: '/(tabs)/patient-detail' as any,
+      params: { patientId: patient._id, patientEmail: patient.email }
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -87,38 +78,24 @@ export default function DashboardScreen() {
     });
   };
 
-  const renderMoodItem = ({ item }: { item: MoodEntry }) => (
-    <View style={styles.moodCard}>
-      <View style={styles.moodHeader}>
-        <View style={styles.moodInfo}>
-          <Text style={styles.moodEmoji}>{getMoodEmoji(item.mood)}</Text>
+  const renderPatientItem = ({ item }: { item: Patient }) => (
+    <Pressable style={styles.patientCard} onPress={() => handlePatientPress(item)}>
+      <View style={styles.patientHeader}>
+        <View style={styles.patientInfo}>
+          <View style={styles.patientAvatar}>
+            <Text style={styles.patientAvatarText}>{item.email.charAt(0).toUpperCase()}</Text>
+          </View>
           <View>
-            <Text style={styles.moodPatient}>{item.userId?.email || 'Unknown'}</Text>
-            <Text style={styles.moodDate}>{formatDate(item.date)}</Text>
+            <Text style={styles.patientEmail}>{item.email}</Text>
+            <Text style={styles.patientDate}>Joined {formatDate(item.createdAt)}</Text>
           </View>
         </View>
-        <View style={[styles.moodBadge, { backgroundColor: getMoodColor(item.mood) }]}>
-          <Text style={styles.moodBadgeText}>{item.mood}</Text>
+        <View style={styles.patientBadge}>
+          <Text style={styles.patientBadgeText}>Patient</Text>
         </View>
       </View>
-      {item.note && (
-        <Text style={styles.moodNote}>{item.note}</Text>
-      )}
-    </View>
+    </Pressable>
   );
-
-  const getMoodColor = (mood: string) => {
-    const colorMap: { [key: string]: string } = {
-      happy: '#10B981',
-      neutral: '#6B7280',
-      sad: '#3B82F6',
-      angry: '#EF4444',
-      anxious: '#F59E0B',
-      excited: '#8B5CF6',
-      tired: '#6366F1',
-    };
-    return colorMap[mood] || '#6B7280';
-  };
 
   return (
     <View style={styles.container}>
@@ -129,17 +106,17 @@ export default function DashboardScreen() {
 
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{moods.length}</Text>
-          <Text style={styles.statLabel}>Total Entries</Text>
+          <Text style={styles.statValue}>{patients.length}</Text>
+          <Text style={styles.statLabel}>Total Patients</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={styles.statValue}>{new Set(moods.map(m => m.userId?.email)).size}</Text>
-          <Text style={styles.statLabel}>Patients</Text>
+          <Text style={styles.statValue}>{patients.length}</Text>
+          <Text style={styles.statLabel}>Active Patients</Text>
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Patient Mood Entries</Text>
+        <Text style={styles.sectionTitle}>Patient List</Text>
 
         {loading ? (
           <View style={styles.centerContainer}>
@@ -148,18 +125,18 @@ export default function DashboardScreen() {
         ) : error ? (
           <View style={styles.centerContainer}>
             <Text style={styles.errorText}>{error}</Text>
-            <Pressable style={styles.retryButton} onPress={fetchMoods}>
+            <Pressable style={styles.retryButton} onPress={fetchPatients}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </Pressable>
           </View>
-        ) : moods.length === 0 ? (
+        ) : patients.length === 0 ? (
           <View style={styles.centerContainer}>
-            <Text style={styles.emptyText}>No mood entries yet</Text>
+            <Text style={styles.emptyText}>No patients yet</Text>
           </View>
         ) : (
           <FlatList
-            data={moods}
-            renderItem={renderMoodItem}
+            data={patients}
+            renderItem={renderPatientItem}
             keyExtractor={(item) => item._id}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -234,7 +211,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingBottom: 20,
   },
-  moodCard: {
+  patientCard: {
     backgroundColor: '#fff',
     padding: 16,
     borderRadius: 12,
@@ -245,46 +222,50 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
-  moodHeader: {
+  patientHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
-  moodInfo: {
+  patientInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
-  moodEmoji: {
-    fontSize: 32,
+  patientAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#6366F1',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  moodPatient: {
+  patientAvatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  patientEmail: {
     fontSize: 15,
     fontWeight: '600',
     color: '#111827',
     marginBottom: 2,
   },
-  moodDate: {
+  patientDate: {
     fontSize: 13,
     color: '#6B7280',
   },
-  moodBadge: {
+  patientBadge: {
+    backgroundColor: '#10B981',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
   },
-  moodBadgeText: {
+  patientBadgeText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
-    textTransform: 'capitalize',
-  },
-  moodNote: {
-    fontSize: 14,
-    color: '#374151',
-    lineHeight: 20,
-    marginTop: 4,
   },
   centerContainer: {
     alignItems: 'center',

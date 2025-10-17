@@ -1,24 +1,24 @@
 import {
-    createGratitudeEntry,
-    deleteGratitudeEntry,
-    getGratitudeEntries,
-    updateGratitudeEntry
+  createGratitudeEntry,
+  deleteGratitudeEntry,
+  getGratitudeEntries,
+  updateGratitudeEntry
 } from '@/app/api/gratitude';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface GratitudeEntry {
@@ -45,11 +45,8 @@ export default function GratitudeJournal() {
   const [newEntry, setNewEntry] = useState({
     title: '',
     content: '',
-    tags: [] as string[],
-    mood: '',
     isDraft: false,
   });
-  const [tagInput, setTagInput] = useState('');
   const [autosaveTimeout, setAutosaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
@@ -112,8 +109,6 @@ export default function GratitudeJournal() {
       const entryData = {
         title: newEntry.title || 'Untitled Entry',
         content: newEntry.content || 'No content provided',
-        tags: newEntry.tags || [],
-        mood: newEntry.mood || undefined,
         isDraft,
         date: selectedDate,
       };
@@ -126,8 +121,7 @@ export default function GratitudeJournal() {
 
       setShowCreateModal(false);
       setEditingEntry(null);
-      setNewEntry({ title: '', content: '', tags: [], mood: '', isDraft: false });
-      setTagInput('');
+      setNewEntry({ title: '', content: '', isDraft: false });
       loadEntries();
     } catch (error) {
       console.error('Error saving entry:', error);
@@ -165,29 +159,11 @@ export default function GratitudeJournal() {
     setNewEntry({
       title: entry.title,
       content: entry.content,
-      tags: entry.tags || [],
-      mood: entry.mood || '',
       isDraft: entry.isDraft,
     });
     setShowCreateModal(true);
   };
 
-  const addTag = () => {
-    if (tagInput.trim() && !newEntry.tags.includes(tagInput.trim())) {
-      setNewEntry(prev => ({
-        ...prev,
-        tags: [...prev.tags, tagInput.trim()]
-      }));
-      setTagInput('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setNewEntry(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
 
   // Autosave functionality
   const handleContentChange = (content: string) => {
@@ -205,8 +181,6 @@ export default function GratitudeJournal() {
         const autosaveData = {
           title: newEntry.title || 'Untitled Entry',
           content: content || 'No content provided',
-          tags: newEntry.tags || [],
-          mood: newEntry.mood || undefined,
           isDraft: true,
           date: selectedDate,
         };
@@ -277,15 +251,6 @@ export default function GratitudeJournal() {
         )}
       </View>
       
-      {item.tags && item.tags.length > 0 && (
-        <View style={styles.tagsContainer}>
-          {item.tags.map((tag, index) => (
-            <View key={index} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-      )}
     </View>
   );
 
@@ -301,31 +266,25 @@ export default function GratitudeJournal() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gratitude Journal</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => {
-            setEditingEntry(null);
-            setNewEntry({ title: '', content: '', tags: [], mood: '', isDraft: false });
-            setShowCreateModal(true);
-          }}
-        >
-          <Ionicons name="add" size={24} color="white" />
-        </TouchableOpacity>
       </View>
 
-      <View style={styles.filtersContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search entries..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
+      <View style={styles.dateContainer}>
         <TextInput
           style={styles.dateInput}
           value={selectedDate}
           onChangeText={setSelectedDate}
           placeholder="YYYY-MM-DD"
         />
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => {
+            setEditingEntry(null);
+            setNewEntry({ title: '', content: '', isDraft: false });
+            setShowCreateModal(true);
+          }}
+        >
+          <Ionicons name="add" size={24} color="white" />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -391,32 +350,6 @@ export default function GratitudeJournal() {
             <Text style={styles.characterCount}>
               {newEntry.content.length}/2000 characters
             </Text>
-
-            <View style={styles.tagsSection}>
-              <Text style={styles.sectionTitle}>Tags</Text>
-              <View style={styles.tagInputContainer}>
-                <TextInput
-                  style={styles.tagInput}
-                  placeholder="Add a tag..."
-                  value={tagInput}
-                  onChangeText={setTagInput}
-                  onSubmitEditing={addTag}
-                />
-                <TouchableOpacity onPress={addTag} style={styles.addTagButton}>
-                  <Ionicons name="add" size={20} color="#007AFF" />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.tagsDisplay}>
-                {newEntry.tags.map((tag, index) => (
-                  <View key={index} style={styles.tagChip}>
-                    <Text style={styles.tagChipText}>{tag}</Text>
-                    <TouchableOpacity onPress={() => removeTag(tag)}>
-                      <Ionicons name="close" size={16} color="#666" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </View>
           </ScrollView>
         </View>
       </Modal>
@@ -456,27 +389,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  filtersContainer: {
+  dateContainer: {
     flexDirection: 'row',
     padding: 15,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    alignItems: 'center',
   },
-  searchInput: {
+  dateInput: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 10,
-    marginRight: 10,
-  },
-  dateInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    width: 120,
+    padding: 12,
+    marginRight: 15,
+    fontSize: 16,
   },
   entriesList: {
     padding: 15,
@@ -533,23 +461,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF9500',
     fontWeight: 'bold',
-  },
-  tagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 10,
-  },
-  tag: {
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 5,
-    marginBottom: 5,
-  },
-  tagText: {
-    fontSize: 12,
-    color: '#1976D2',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -622,49 +533,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
     marginBottom: 20,
-  },
-  tagsSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  tagInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  tagInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 10,
-    marginRight: 10,
-  },
-  addTagButton: {
-    padding: 10,
-  },
-  tagsDisplay: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  tagChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 5,
-    marginBottom: 5,
-  },
-  tagChipText: {
-    fontSize: 12,
-    color: '#1976D2',
-    marginRight: 5,
   },
 });
