@@ -78,7 +78,7 @@ export default function LogMoodScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" testID="activity-indicator" />
       </View>
     );
   }
