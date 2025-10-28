@@ -7,6 +7,7 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Tex
 interface MoodEntry {
   _id: string;
   userId: {
+    _id: string;
     email: string;
     role: string;
   };
@@ -23,6 +24,11 @@ interface GratitudeEntry {
   date: string;
   createdAt: string;
   isDraft: boolean;
+  user: {
+    _id: string;
+    email: string;
+    role: string;
+  };
 }
 
 export default function PatientDetailScreen() {
@@ -56,7 +62,7 @@ export default function PatientDetailScreen() {
       }
 
       // Fetch gratitude entries for this patient
-      const gratitudeResponse = await fetch(`${API_ENDPOINTS.GRATITUDE.ENTRIES}?userId=${patientId}`, {
+      const gratitudeResponse = await fetch(`${API_ENDPOINTS.GRATITUDE.ALL_PATIENTS}?userId=${patientId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

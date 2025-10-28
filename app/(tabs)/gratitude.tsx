@@ -59,7 +59,7 @@ export default function GratitudeJournal() {
     if (token) {
       loadEntries();
     }
-  }, [token, selectedDate]);
+  }, [token]);
 
   const loadToken = async () => {
     try {
@@ -77,8 +77,6 @@ export default function GratitudeJournal() {
     try {
       setLoading(true);
       const data = await getGratitudeEntries(token, {
-        startDate: selectedDate,
-        endDate: selectedDate,
         limit: 50
       });
       setEntries(data.entries || []);
@@ -94,7 +92,7 @@ export default function GratitudeJournal() {
     setRefreshing(true);
     await loadEntries();
     setRefreshing(false);
-  }, [token, selectedDate]);
+  }, [token]);
 
   const handleSaveEntry = async (isDraft = false) => {
     if (!token) return;
