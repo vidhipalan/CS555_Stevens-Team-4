@@ -14,5 +14,6 @@ export const API_ENDPOINTS = {
   GRATITUDE: {
     ENTRIES: `${API_URL}/api/gratitude`,
     DRAFTS: `${API_URL}/api/gratitude/drafts`,
+    ALL_PATIENTS: `${API_URL}/api/gratitude/all-patients`,
   },
 };

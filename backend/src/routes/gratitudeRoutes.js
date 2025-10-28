@@ -7,7 +7,8 @@ const {
   updateGratitudeEntry,
   deleteGratitudeEntry,
   getGratitudeEntriesByDate,
-  getDraftEntries
+  getDraftEntries,
+  getAllPatientsGratitude
 } = require('../controllers/gratitudeController');
 const auth = require('../middleware/auth');
 
@@ -23,6 +24,11 @@ router.get('/', getGratitudeEntries);
 // @desc    Get all draft entries for authenticated user
 // @access  Private
 router.get('/drafts', getDraftEntries);
+
+// @route   GET /api/gratitude/all-patients
+// @desc    Get gratitude entries for all patients (clinician only)
+// @access  Private (Clinician only)
+router.get('/all-patients', getAllPatientsGratitude);
 
 // @route   GET /api/gratitude/date/:date
 // @desc    Get gratitude entries for specific date

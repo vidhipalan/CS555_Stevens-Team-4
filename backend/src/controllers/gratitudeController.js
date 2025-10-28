@@ -239,6 +239,55 @@ const getDraftEntries = async (req, res) => {
   }
 };
 
+// @desc    Get gratitude entries for all patients (clinician only)
+// @route   GET /api/gratitude/all-patients
+// @access  Private (Clinician only)
+const getAllPatientsGratitude = async (req, res) => {
+  try {
+    const User = require('../models/User');
+
+    // Get the requesting user
+    const requestingUser = await User.findById(req.user.id);
+    if (!requestingUser || requestingUser.role !== 'clinician') {
+      return res.status(403).json({ error: 'Access denied. Clinicians only.' });
+    }
+
+    const { userId, page = 1, limit = 50, startDate, endDate } = req.query;
+
+    // Build query
+    const query = {};
+    
+    if (userId) {
+      query.user = userId;
+    }
+
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = new Date(startDate);
+      if (endDate) query.date.$lte = new Date(endDate);
+    }
+
+    // Execute query with pagination
+    const entries = await Gratitude.find(query)
+      .sort({ date: -1, createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .populate('user', 'email role');
+
+    const total = await Gratitude.countDocuments(query);
+
+    res.json({
+      entries,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+  } catch (error) {
+    console.error('Error fetching all patients gratitude entries:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 module.exports = {
   getGratitudeEntries,
   getGratitudeEntry,
@@ -246,5 +295,6 @@ module.exports = {
   updateGratitudeEntry,
   deleteGratitudeEntry,
   getGratitudeEntriesByDate,
-  getDraftEntries
+  getDraftEntries,
+  getAllPatientsGratitude
 };
