@@ -31,7 +31,7 @@ describe('Auth Middleware', () => {
       authMiddleware(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      expect(mockReq.userId).toBe(userId);
+      expect(mockReq.user.id).toBe(userId);
       expect(mockRes.status).not.toHaveBeenCalled();
     });
 
@@ -43,7 +43,7 @@ describe('Auth Middleware', () => {
 
       authMiddleware(mockReq, mockRes, mockNext);
 
-      expect(mockReq.userId).toBe(userId);
+      expect(mockReq.user.id).toBe(userId);
       expect(mockNext).toHaveBeenCalled();
     });
   });
