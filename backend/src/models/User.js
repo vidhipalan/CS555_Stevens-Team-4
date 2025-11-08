@@ -22,6 +22,10 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     default: 'patient',
   },
+  rocketChatUserId: {
+    type: String,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

@@ -15,4 +15,8 @@ export const API_ENDPOINTS = {
     ENTRIES: `${API_URL}/api/gratitude`,
     DRAFTS: `${API_URL}/api/gratitude/drafts`,
   },
+  ROCKETCHAT: {
+    LOGIN: `${API_URL}/api/rocketchat/login`,
+    CHANNELS: `${API_URL}/api/rocketchat/channels`,
+  },
 };
