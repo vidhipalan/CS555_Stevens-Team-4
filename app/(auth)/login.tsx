@@ -49,9 +49,9 @@ export default function Login() {
 
       // Route based on role
       if (data.user.role === 'clinician') {
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/dashboard' as any);
       } else {
-        router.replace('/(tabs)');
+        router.replace('/(tabs)' as any);
       }
     } catch (e: any) {
       if (e?.name === 'AbortError') {

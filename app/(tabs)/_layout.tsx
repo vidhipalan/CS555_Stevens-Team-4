@@ -34,7 +34,7 @@ export default function TabLayout() {
         options={{
           title: 'Dashboard',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
-          href: isClinician ? '/dashboard' : null,
+          href: isClinician ? undefined : null,
         }}
       />
       {/* Home - For patients, hidden for clinicians */}
@@ -43,7 +43,14 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-          href: !isClinician ? '/' : null,
+          href: !isClinician ? undefined : null,
+        }}
+      />
+      <Tabs.Screen
+        name="chat-list"
+        options={{
+          title: 'Chat',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="message.fill" color={color} />,
         }}
       />
       <Tabs.Screen
@@ -51,6 +58,12 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
