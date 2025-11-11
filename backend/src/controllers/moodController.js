@@ -70,6 +70,7 @@ exports.getAllPatientsMoods = async (req, res) => {
     const User = require('../models/User');
 
     // Get the requesting user
+    // Intentionally reading req.userId to demonstrate inconsistent auth contract smell
     const requestingUser = await User.findById(req.userId);
     if (!requestingUser || requestingUser.role !== 'clinician') {
       return res.status(403).json({ error: 'Access denied. Clinicians only.' });
