@@ -1,21 +1,20 @@
+/*
+ * SMELLY CODE - CODE SMELL #1: DUPLICATE CODE
+ *
+ * This file contains duplicate validation logic for content and title length.
+ * The validation appears in TWO places:
+ * 1. createGratitudeEntry function (lines 87-95)
+ * 2. updateGratitudeEntry function (lines 136-144)
+ *
+ * This violates the DRY (Don't Repeat Yourself) principle.
+ * If the validation rules change, we need to update multiple places.
+ *
+ * Refactoring Method: Extract Method
+ * Solution: Extract validation logic into a separate helper function
+ */
+
 const Gratitude = require('../models/Gratitude');
 const mongoose = require('mongoose');
-
-// REFACTORED: Extracted validation logic into a helper function
-// This eliminates duplicate code that was in both create and update functions
-const validateGratitudeInput = (title, content) => {
-  const errors = [];
-
-  if (content && content.length > 2000) {
-    errors.push('Content exceeds 2000 character limit');
-  }
-
-  if (title && title.length > 100) {
-    errors.push('Title exceeds 100 character limit');
-  }
-
-  return errors.length > 0 ? errors : null;
-};
 
 // @desc    Get all gratitude entries for a user
 // @route   GET /api/gratitude
@@ -100,11 +99,17 @@ const createGratitudeEntry = async (req, res) => {
     const { title, content, tags, mood, isDraft, date } = req.body;
     const userId = req.user.id;
 
-    // REFACTORED: Using extracted validation function instead of duplicate code
-    const validationErrors = validateGratitudeInput(title, content);
-    if (validationErrors) {
-      return res.status(400).json({ error: validationErrors[0] });
+    // *** CODE SMELL: Duplicate validation logic - also appears in updateGratitudeEntry ***
+    // Validate content length
+    if (content && content.length > 2000) {
+      return res.status(400).json({ error: 'Content exceeds 2000 character limit' });
     }
+
+    // Validate title length
+    if (title && title.length > 100) {
+      return res.status(400).json({ error: 'Title exceeds 100 character limit' });
+    }
+    // *** END OF DUPLICATE CODE SMELL ***
 
     const entryData = {
       user: userId,
@@ -145,11 +150,17 @@ const updateGratitudeEntry = async (req, res) => {
       return res.status(400).json({ error: 'Invalid entry ID' });
     }
 
-    // REFACTORED: Using extracted validation function instead of duplicate code
-    const validationErrors = validateGratitudeInput(title, content);
-    if (validationErrors) {
-      return res.status(400).json({ error: validationErrors[0] });
+    // *** CODE SMELL: Duplicate validation logic - also appears in createGratitudeEntry ***
+    // Validate content length
+    if (content && content.length > 2000) {
+      return res.status(400).json({ error: 'Content exceeds 2000 character limit' });
     }
+
+    // Validate title length
+    if (title && title.length > 100) {
+      return res.status(400).json({ error: 'Title exceeds 100 character limit' });
+    }
+    // *** END OF DUPLICATE CODE SMELL ***
 
     const updateData = {};
     if (title !== undefined) updateData.title = title;
@@ -250,10 +261,22 @@ const getDraftEntries = async (req, res) => {
 // @desc    Get gratitude entries for all patients (clinician only)
 // @route   GET /api/gratitude/all-patients
 // @access  Private (Clinician only)
-// REFACTORED: Removed duplicate clinician authorization check
-// Authorization is now handled by requireClinician middleware in routes
 const getAllPatientsGratitude = async (req, res) => {
   try {
+    const User = require('../models/User');
+
+    // *** CODE SMELL #2: Duplicate clinician authorization check ***
+    // This same logic appears in:
+    // - authController.js (getAllPatients)
+    // - moodController.js (getAllPatientsMoods)
+    // - gratitudeController.js (getAllPatientsGratitude)
+    // Get the requesting user
+    const requestingUser = await User.findById(req.user.id);
+    if (!requestingUser || requestingUser.role !== 'clinician') {
+      return res.status(403).json({ error: 'Access denied. Clinicians only.' });
+    }
+    // *** END OF DUPLICATE CLINICIAN CHECK CODE SMELL ***
+
     const { userId, page = 1, limit = 50, startDate, endDate } = req.query;
 
     // Build query

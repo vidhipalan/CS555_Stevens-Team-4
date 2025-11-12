@@ -11,6 +11,7 @@ const {
   getAllPatientsGratitude
 } = require('../controllers/gratitudeController');
 const auth = require('../middleware/auth');
+const { requireClinician } = require('../middleware/roleAuth');
 
 // All routes are protected
 router.use(auth);
@@ -28,7 +29,8 @@ router.get('/drafts', getDraftEntries);
 // @route   GET /api/gratitude/all-patients
 // @desc    Get gratitude entries for all patients (clinician only)
 // @access  Private (Clinician only)
-router.get('/all-patients', getAllPatientsGratitude);
+// REFACTORED: Using requireClinician middleware for role-based authorization
+router.get('/all-patients', requireClinician, getAllPatientsGratitude);
 
 // @route   GET /api/gratitude/date/:date
 // @desc    Get gratitude entries for specific date
