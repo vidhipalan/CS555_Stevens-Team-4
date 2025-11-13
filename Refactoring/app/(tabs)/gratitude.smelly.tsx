@@ -1,6 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
 import {
+  createGratitudeEntry,
+  deleteGratitudeEntry,
+  getGratitudeEntries,
+  updateGratitudeEntry
+} from '@/app/api/gratitude';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -11,11 +20,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useAuthToken } from '@/hooks/useAuthToken';
-import { useGratitudeEntries } from '@/hooks/useGratitudeEntries';
-import { useAutosave } from '@/hooks/useAutosave';
-import { useGratitudeEditor } from '@/hooks/useGratitudeEditor';
 
+// Bad smell: "God component". This mixes token fetching, API calls,
+// autosave timers, modal/editor UI, and list rendering in one place.
+// Works, but it's hard to test and change safely.
 interface GratitudeEntry {
   _id: string;
   title: string;
@@ -28,75 +36,170 @@ interface GratitudeEntry {
   updatedAt: string;
 }
 
+// Bad smell: All concerns mixed in one component
 export default function GratitudeJournal() {
+  const [entries, setEntries] = useState<GratitudeEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  // Concern 4: Modal/editor UI state (should be in a hook)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<GratitudeEntry | null>(null);
+  const [newEntry, setNewEntry] = useState({
+    title: '',
+    content: '',
+    isDraft: false,
+  });
+  // Concern 3: Autosave logic (should be in a hook)
+  const [autosaveTimeout, setAutosaveTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  // Extract concern 1: Token management
-  const { token, loading: tokenLoading } = useAuthToken();
+  const router = useRouter();
 
-  // Extract concern 2: Data fetching
-  const {
-    entries,
-    loading: entriesLoading,
-    refreshing,
-    onRefresh,
-    saveEntry,
-    removeEntry,
-    loadEntries,
-  } = useGratitudeEntries(token);
+  // Concern 1: Token management (should be in a hook)
+  useEffect(() => {
+    loadToken();
+  }, []);
 
-  // Extract concern 3: Autosave logic
-  const { triggerAutosave, cancelAutosave } = useAutosave(
-    async (data) => {
-      if (data.content && data.content.trim().length > 10 && token) {
-        await saveEntry({
-          ...data,
-          isDraft: true,
-        });
-      }
-    },
-    5000
-  );
-
-  // Extract concern 4: Editor/modal state
-  const {
-    showModal: showCreateModal,
-    editingEntry,
-    editorState: newEntry,
-    openEditor,
-    closeEditor,
-    handleSave: handleSaveEntry,
-    handleDelete: handleDeleteEntry,
-    updateEditorState,
-  } = useGratitudeEditor(saveEntry, removeEntry, selectedDate);
-
-  // Load entries when token is available
   useEffect(() => {
     if (token) {
       loadEntries();
     }
-  }, [token, loadEntries]);
+  }, [token]);
 
-  // Handle content change with autosave
-  const handleContentChange = (content: string) => {
-    updateEditorState({ content });
-    if (editingEntry) {
-      triggerAutosave({
-        ...newEntry,
-        content,
-        _id: editingEntry._id,
-      });
+  const loadToken = async () => {
+    try {
+      const storedToken = await SecureStore.getItemAsync('auth_token');
+      setToken(storedToken);
+    } catch (error) {
+      console.error('Error loading token:', error);
+      router.replace('/(auth)/login' as any);
     }
   };
 
-  // Cancel autosave when saving manually
-  const handleManualSave = async (isDraft = false) => {
-    cancelAutosave();
-    await handleSaveEntry(isDraft);
+  // Concern 2: Data fetching (should be in a hook)
+  const loadEntries = async () => {
+    if (!token) return;
+    
+    try {
+      setLoading(true);
+      const data = await getGratitudeEntries(token, {
+        limit: 50
+      });
+      setEntries(data.entries || []);
+    } catch (error) {
+      console.error('Error loading entries:', error);
+      Alert.alert('Error', 'Failed to load gratitude entries');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadEntries();
+    setRefreshing(false);
+  }, [token]);
+
+  const handleSaveEntry = async (isDraft = false) => {
+    if (!token) return;
+
+    // Clear any pending autosave
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+      setAutosaveTimeout(null);
+    }
+
+    try {
+      const entryData = {
+        title: newEntry.title || 'Untitled Entry',
+        content: newEntry.content || 'No content provided',
+        isDraft,
+        date: selectedDate,
+      };
+
+      if (editingEntry) {
+        await updateGratitudeEntry(token, editingEntry._id, entryData);
+      } else {
+        await createGratitudeEntry(token, entryData);
+      }
+
+      setShowCreateModal(false);
+      setEditingEntry(null);
+      setNewEntry({ title: '', content: '', isDraft: false });
+      loadEntries();
+    } catch (error) {
+      console.error('Error saving entry:', error);
+      Alert.alert('Error', 'Failed to save entry');
+    }
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    if (!token) return;
+
+    Alert.alert(
+      'Delete Entry',
+      'Are you sure you want to delete this gratitude entry?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteGratitudeEntry(token, id);
+              loadEntries();
+            } catch (error) {
+              console.error('Error deleting entry:', error);
+              Alert.alert('Error', 'Failed to delete entry');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleEditEntry = (entry: GratitudeEntry) => {
-    openEditor(entry);
+    setEditingEntry(entry);
+    setNewEntry({
+      title: entry.title,
+      content: entry.content,
+      isDraft: entry.isDraft,
+    });
+    setShowCreateModal(true);
+  };
+
+
+  // Concern 3: Autosave functionality (should be in a hook)
+  const handleContentChange = (content: string) => {
+    setNewEntry(prev => ({ ...prev, content }));
+    
+    // Clear existing timeout
+    if (autosaveTimeout) {
+      clearTimeout(autosaveTimeout);
+    }
+    
+    // Set new timeout for autosave (only if content is substantial)
+    const timeout = setTimeout(() => {
+      if (content.trim().length > 10 && token) {
+        // Only autosave if we have substantial content
+        const autosaveData = {
+          title: newEntry.title || 'Untitled Entry',
+          content: content || 'No content provided',
+          isDraft: true,
+          date: selectedDate,
+        };
+        
+        if (editingEntry) {
+          updateGratitudeEntry(token, editingEntry._id, autosaveData).catch(console.error);
+        } else {
+          createGratitudeEntry(token, autosaveData).catch(console.error);
+        }
+      }
+    }, 5000); // Autosave after 5 seconds of inactivity
+    
+    setAutosaveTimeout(timeout);
   };
 
   const formatDate = (dateString: string) => {
@@ -157,7 +260,7 @@ export default function GratitudeJournal() {
     </View>
   );
 
-  if (tokenLoading || entriesLoading) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <Text>Loading gratitude entries...</Text>
@@ -180,7 +283,11 @@ export default function GratitudeJournal() {
         />
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => openEditor()}
+          onPress={() => {
+            setEditingEntry(null);
+            setNewEntry({ title: '', content: '', isDraft: false });
+            setShowCreateModal(true);
+          }}
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>
@@ -211,7 +318,7 @@ export default function GratitudeJournal() {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <TouchableOpacity
-              onPress={closeEditor}
+              onPress={() => setShowCreateModal(false)}
               style={styles.cancelButton}
             >
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -220,7 +327,7 @@ export default function GratitudeJournal() {
               {editingEntry ? 'Edit Entry' : 'New Entry'}
             </Text>
             <TouchableOpacity
-              onPress={() => handleManualSave(false)}
+              onPress={() => handleSaveEntry(false)}
               style={styles.saveButton}
             >
               <Text style={styles.saveButtonText}>Save</Text>
@@ -232,7 +339,7 @@ export default function GratitudeJournal() {
               style={styles.titleInput}
               placeholder="Entry title..."
               value={newEntry.title}
-              onChangeText={(text) => updateEditorState({ title: text })}
+              onChangeText={(text) => setNewEntry(prev => ({ ...prev, title: text }))}
               maxLength={100}
             />
 

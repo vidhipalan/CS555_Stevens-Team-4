@@ -65,12 +65,15 @@ exports.getHistory = async (req, res) => {
   }
 };
 
+// Bad smell: depends on req.userId while other code uses req.user.id.
+// This inconsistency invites subtle bugs but "works" with the current middleware.
 exports.getAllPatientsMoods = async (req, res) => {
   try {
     const User = require('../models/User');
 
     // Get the requesting user
-    const requestingUser = await User.findById(req.user.id);
+    // Bad smell: uses req.userId while other functions above use req.user.id
+    const requestingUser = await User.findById(req.userId); // inconsistent contract
     if (!requestingUser || requestingUser.role !== 'clinician') {
       return res.status(403).json({ error: 'Access denied. Clinicians only.' });
     }
@@ -89,5 +92,4 @@ exports.getAllPatientsMoods = async (req, res) => {
     return res.status(500).json({ error: 'Failed to fetch patient moods' });
   }
 };
-
 
