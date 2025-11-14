@@ -25,22 +25,40 @@ export default function Login() {
     setServerError(null);
     try {
       const controller = new AbortController();
-      const t = setTimeout(() => controller.abort(), 10000);
-      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(values),
-        signal: controller.signal,
-      });
-      clearTimeout(t);
+      const t = setTimeout(() => {
+        console.warn('Request timeout - aborting');
+        controller.abort();
+      }, 15000); // Increased to 15 seconds
+      
+      console.log('Attempting to login to:', API_ENDPOINTS.AUTH.LOGIN);
+      console.log('Request body:', { email: values.email, password: '***' });
+      
+      let response;
+      try {
+        response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(values),
+          signal: controller.signal,
+        });
+        clearTimeout(t);
+      } catch (fetchError: any) {
+        clearTimeout(t);
+        if (fetchError.name === 'AbortError') {
+          throw new Error('Request timeout. Please check your network connection and ensure the backend server is running.');
+        }
+        throw fetchError;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
-      }
 
       // Save token, email, and role
       await SecureStore.setItemAsync('auth_token', data.token);
@@ -54,10 +72,16 @@ export default function Login() {
         router.replace('/(tabs)');
       }
     } catch (e: any) {
-      if (e?.name === 'AbortError') {
-        setServerError('Request timed out. Check network/API URL.');
+      console.error('Login error:', e);
+      console.error('Error name:', e?.name);
+      console.error('Error message:', e?.message);
+      
+      if (e?.name === 'AbortError' || e?.message?.includes('Aborted')) {
+        setServerError(`Request timeout. Please check:\n1. Backend is running: cd backend && npm run dev\n2. Backend URL: ${API_ENDPOINTS.AUTH.LOGIN}\n3. Same Wi-Fi network\n4. Try: curl ${API_ENDPOINTS.AUTH.LOGIN}`);
+      } else if (e?.message?.includes('Network request failed') || e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
+        setServerError(`Cannot connect to server at ${API_ENDPOINTS.AUTH.LOGIN}\n\nPlease check:\n1. Backend is running on port 5050\n2. Correct IP address (current: 192.168.80.72)\n3. Same Wi-Fi network\n4. Firewall settings\n5. Try: EXPO_PUBLIC_API_URL="http://YOUR_IP:5050" npx expo start -c`);
       } else {
-        setServerError(e?.message || 'Something went wrong');
+        setServerError(e?.message || 'Login failed. Please try again.');
       }
     }
   };

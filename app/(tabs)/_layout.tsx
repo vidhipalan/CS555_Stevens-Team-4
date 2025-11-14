@@ -77,6 +77,25 @@ export default function TabLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="meetings"
+        options={{
+          title: 'Meetings',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="video.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="request-meeting"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="meeting-requests"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
