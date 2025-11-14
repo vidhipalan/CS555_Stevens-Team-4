@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Link } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function HomeScreen() {
   const [email, setEmail] = useState<string>('');
@@ -18,7 +18,7 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       {/* Header with greeting */}
       <View style={styles.header}>
         <Text style={styles.title}>Good Day, {email || 'User'}!</Text>
@@ -70,8 +70,23 @@ export default function HomeScreen() {
             </View>
           </Pressable>
         </Link>
+
+        {/* Meetings Button */}
+        <Link href={("/(tabs)/meetings" as unknown as any)} asChild>
+          <Pressable style={styles.featureButton}>
+            <View style={styles.buttonContent}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="videocam-outline" size={24} color="#007AFF" />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={styles.buttonTitle}>Meetings</Text>
+                <Text style={styles.buttonDescription}>View and manage your scheduled meetings</Text>
+              </View>
+            </View>
+          </Pressable>
+        </Link>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 

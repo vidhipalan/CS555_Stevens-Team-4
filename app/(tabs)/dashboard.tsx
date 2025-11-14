@@ -1,8 +1,9 @@
 import { API_ENDPOINTS } from '@/constants/config';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface Patient {
   _id: string;
@@ -17,6 +18,7 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const fetchPatients = async () => {
     try {
@@ -51,6 +53,8 @@ export default function DashboardScreen() {
     const load = async () => {
       const e = await SecureStore.getItemAsync('user_email');
       if (e) setEmail(e);
+      const role = await SecureStore.getItemAsync('user_role');
+      setUserRole(role);
       await fetchPatients();
     };
     load();
@@ -100,8 +104,24 @@ export default function DashboardScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Clinician Dashboard</Text>
-        <Text style={styles.subtitle}>Welcome, {email || 'Doctor'}</Text>
+        <View>
+          <Text style={styles.title}>Clinician Dashboard</Text>
+          <Text style={styles.subtitle}>Welcome, {email || 'Doctor'}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.meetingRequestsButton}
+          onPress={() => {
+            // Security: Only allow clinicians to access meeting requests
+            if (userRole === 'clinician') {
+              router.push('/(tabs)/meeting-requests' as any);
+            } else {
+              Alert.alert('Access Denied', 'Only clinicians can view meeting requests.');
+            }
+          }}
+        >
+          <Ionicons name="mail" size={20} color="#007AFF" />
+          <Text style={styles.meetingRequestsButtonText}>Requests</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.statsContainer}>
@@ -158,6 +178,23 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#6366F1',
     paddingTop: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  meetingRequestsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  meetingRequestsButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
   title: {
     fontSize: 28,

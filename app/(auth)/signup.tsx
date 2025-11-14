@@ -31,6 +31,9 @@ export default function Signup() {
     try {
       const controller = new AbortController();
       const t = setTimeout(() => controller.abort(), 10000);
+      
+      console.log('Attempting to signup to:', API_ENDPOINTS.AUTH.SIGNUP);
+      
       const response = await fetch(API_ENDPOINTS.AUTH.SIGNUP, {
         method: 'POST',
         headers: {
@@ -41,11 +44,12 @@ export default function Signup() {
       });
       clearTimeout(t);
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Signup failed');
+        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
       }
+
+      const data = await response.json();
 
       // Save token, email, and role
       await SecureStore.setItemAsync('auth_token', data.token);
@@ -59,10 +63,13 @@ export default function Signup() {
         router.replace('/(tabs)' as any);
       }
     } catch (e: any) {
+      console.error('Signup error:', e);
       if (e?.name === 'AbortError') {
-        setServerError('Request timed out. Check network/API URL.');
+        setServerError('Request timeout. Please check your connection and ensure backend is running.');
+      } else if (e?.message?.includes('Network request failed') || e?.message?.includes('Failed to fetch')) {
+        setServerError(`Cannot connect to server at ${API_ENDPOINTS.AUTH.SIGNUP}. Please check:\n1. Backend is running\n2. Correct IP address\n3. Same Wi-Fi network`);
       } else {
-        setServerError(e?.message || 'Something went wrong');
+        setServerError(e?.message || 'Signup failed. Please try again.');
       }
     }
   };
