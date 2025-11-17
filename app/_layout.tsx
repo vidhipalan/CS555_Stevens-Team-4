@@ -18,38 +18,60 @@ export default function RootLayout() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (process.env.EXPO_PUBLIC_FORCE_LOGOUT === '1') {
-        await SecureStore.deleteItemAsync('auth_token');
-        await SecureStore.deleteItemAsync('user_email');
-        await SecureStore.deleteItemAsync('user_role');
+      try {
+        if (process.env.EXPO_PUBLIC_FORCE_LOGOUT === '1') {
+          await SecureStore.deleteItemAsync('auth_token');
+          await SecureStore.deleteItemAsync('user_email');
+          await SecureStore.deleteItemAsync('user_role');
+          setHasToken(false);
+          const inAuthGroupNow = segments[0] === '(auth)';
+          if (!inAuthGroupNow) router.replace('/(auth)/login');
+          return;
+        }
+
+        const token = await SecureStore.getItemAsync('auth_token');
+        const userRole = await SecureStore.getItemAsync('user_role');
+        console.log('auth_token:', token); 
+        const tokenExists = !!token;
+        setHasToken(tokenExists);
+
+        const inAuthGroup = segments[0] === '(auth)';
+
+        if (!tokenExists && !inAuthGroup) {
+          router.replace('/(auth)/login');
+        } else if (tokenExists && inAuthGroup) {
+          // Route based on user role
+          if (userRole === 'clinician') {
+            router.replace('/(tabs)/dashboard');
+          } else {
+            router.replace('/(tabs)');
+          }
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        // On error, assume no token and redirect to login
         setHasToken(false);
-        const inAuthGroupNow = segments[0] === '(auth)';
-        if (!inAuthGroupNow) router.replace('/(auth)/login');
-        return;
-      }
-
-      const token = await SecureStore.getItemAsync('auth_token');
-      const userRole = await SecureStore.getItemAsync('user_role');
-      console.log('auth_token:', token); 
-      const tokenExists = !!token;
-      setHasToken(tokenExists);
-
-      const inAuthGroup = segments[0] === '(auth)';
-
-      if (!tokenExists && !inAuthGroup) {
-        router.replace('/(auth)/login');
-      } else if (tokenExists && inAuthGroup) {
-        // Route based on user role
-        if (userRole === 'clinician') {
-          router.replace('/(tabs)/dashboard');
-        } else {
-          router.replace('/(tabs)');
+        if (segments[0] !== '(auth)') {
+          router.replace('/(auth)/login');
         }
       }
     };
 
+    // Add timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      if (hasToken === null) {
+        console.warn('Auth check timeout, defaulting to no token');
+        setHasToken(false);
+        if (segments[0] !== '(auth)') {
+          router.replace('/(auth)/login');
+        }
+      }
+    }, 3000); // 3 second timeout
+
     checkAuth();
-  }, [segments]);
+
+    return () => clearTimeout(timeoutId);
+  }, [segments, router]);
 
   if (!forceLogout && hasToken === null) {
     return (

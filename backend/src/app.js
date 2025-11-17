@@ -10,7 +10,6 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/moods', require('./routes/moodRoutes'));
-app.use('/api/gratitude', require('./routes/gratitudeRoutes'));
 
 module.exports = app;
 

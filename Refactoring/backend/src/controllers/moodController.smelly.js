@@ -20,7 +20,7 @@ exports.getByDate = async (req, res) => {
     if (req.query.date && !dateOnly) {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
-    const mood = await Mood.findOne({ userId: req.userId, date: dateOnly });
+    const mood = await Mood.findOne({ userId: req.user.id, date: dateOnly });
     return res.json(mood || null);
   } catch (err) {
     console.error('getByDate error:', err);
@@ -39,12 +39,12 @@ exports.createOrUpdateByDate = async (req, res) => {
       return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
 
-    const existing = await Mood.findOne({ userId: req.userId, date: dateOnly });
+    const existing = await Mood.findOne({ userId: req.user.id, date: dateOnly });
     if (existing) {
       return res.status(409).json({ error: 'Mood already logged for this date' });
     }
 
-    const created = await Mood.create({ userId: req.userId, date: dateOnly, mood, note: note || '' });
+    const created = await Mood.create({ userId: req.user.id, date: dateOnly, mood, note: note || '' });
     return res.status(201).json(created);
   } catch (err) {
     console.error('createOrUpdateByDate error:', err);
@@ -55,7 +55,7 @@ exports.createOrUpdateByDate = async (req, res) => {
 exports.getHistory = async (req, res) => {
   try {
     const limit = Math.max(1, Math.min(365, parseInt(req.query.limit, 10) || 60));
-    const history = await Mood.find({ userId: req.userId })
+    const history = await Mood.find({ userId: req.user.id })
       .sort({ date: -1 })
       .limit(limit);
     return res.json(history);
@@ -65,4 +65,31 @@ exports.getHistory = async (req, res) => {
   }
 };
 
+// Bad smell: depends on req.userId while other code uses req.user.id.
+// This inconsistency invites subtle bugs but "works" with the current middleware.
+exports.getAllPatientsMoods = async (req, res) => {
+  try {
+    const User = require('../models/User');
+
+    // Get the requesting user
+    // Bad smell: uses req.userId while other functions above use req.user.id
+    const requestingUser = await User.findById(req.userId); // inconsistent contract
+    if (!requestingUser || requestingUser.role !== 'clinician') {
+      return res.status(403).json({ error: 'Access denied. Clinicians only.' });
+    }
+
+    const limit = Math.max(1, Math.min(500, parseInt(req.query.limit, 10) || 100));
+
+    // Get all moods from all users, populate user info
+    const moods = await Mood.find({})
+      .populate('userId', 'email role')
+      .sort({ date: -1, createdAt: -1 })
+      .limit(limit);
+
+    return res.json(moods);
+  } catch (err) {
+    console.error('getAllPatientsMoods error:', err);
+    return res.status(500).json({ error: 'Failed to fetch patient moods' });
+  }
+};
 
