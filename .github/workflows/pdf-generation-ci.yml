@@ -4,16 +4,18 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'backend/src/controllers/pdfController.js'
-      - 'backend/src/routes/pdfRoutes.js'
       - 'backend/tests/pdf.test.js'
+      - 'backend/src/app.js'
+      - 'backend/src/routes/**'
+      - 'backend/src/controllers/**'
       - 'backend/package.json'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'backend/src/controllers/pdfController.js'
-      - 'backend/src/routes/pdfRoutes.js'
       - 'backend/tests/pdf.test.js'
+      - 'backend/src/app.js'
+      - 'backend/src/routes/**'
+      - 'backend/src/controllers/**'
       - 'backend/package.json'
   workflow_dispatch:
 
