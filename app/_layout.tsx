@@ -25,7 +25,9 @@ export default function RootLayout() {
           await SecureStore.deleteItemAsync('user_role');
           setHasToken(false);
           const inAuthGroupNow = segments[0] === '(auth)';
-          if (!inAuthGroupNow) router.replace('/(auth)/login');
+          if (!inAuthGroupNow) {
+            router.replace('/(auth)/login' as any);
+          }
           return;
         }
 
@@ -35,24 +37,44 @@ export default function RootLayout() {
         const tokenExists = !!token;
         setHasToken(tokenExists);
 
-        const inAuthGroup = segments[0] === '(auth)';
+        const currentSegment = segments[0];
+        const inAuthGroup = currentSegment === '(auth)';
+        const inTabsGroup = currentSegment === '(tabs)';
 
-        if (!tokenExists && !inAuthGroup) {
-          router.replace('/(auth)/login');
-        } else if (tokenExists && inAuthGroup) {
-          // Route based on user role
-          if (userRole === 'clinician') {
-            router.replace('/(tabs)/dashboard');
-          } else {
-            router.replace('/(tabs)');
+        // If no token and not in auth group, redirect to login
+        if (!tokenExists) {
+          if (!inAuthGroup) {
+            router.replace('/(auth)/login' as any);
+          }
+          return;
+        }
+
+        // If token exists, handle routing based on current location
+        if (tokenExists) {
+          // If in auth group, redirect to appropriate tab
+          if (inAuthGroup) {
+            if (userRole === 'clinician') {
+              router.replace('/(tabs)/dashboard' as any);
+            } else {
+              router.replace('/(tabs)' as any);
+            }
+          } 
+          // If not in any group or at root, redirect to appropriate tab
+          else if (!inTabsGroup && currentSegment !== 'modal') {
+            if (userRole === 'clinician') {
+              router.replace('/(tabs)/dashboard' as any);
+            } else {
+              router.replace('/(tabs)' as any);
+            }
           }
         }
       } catch (error) {
         console.error('Error checking auth:', error);
         // On error, assume no token and redirect to login
         setHasToken(false);
-        if (segments[0] !== '(auth)') {
-          router.replace('/(auth)/login');
+        const currentSegment = segments[0];
+        if (currentSegment !== '(auth)') {
+          router.replace('/(auth)/login' as any);
         }
       }
     };
@@ -62,8 +84,9 @@ export default function RootLayout() {
       if (hasToken === null) {
         console.warn('Auth check timeout, defaulting to no token');
         setHasToken(false);
-        if (segments[0] !== '(auth)') {
-          router.replace('/(auth)/login');
+        const currentSegment = segments[0];
+        if (currentSegment !== '(auth)') {
+          router.replace('/(auth)/login' as any);
         }
       }
     }, 3000); // 3 second timeout
@@ -84,17 +107,10 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ headerShown: false }}>
-        {(forceLogout ? false : hasToken) ? (
-          <>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-          </>
-        ) : (
-          <>
-            <Stack.Screen name="(auth)/login" />
-            <Stack.Screen name="(auth)/signup" />
-          </>
-        )}
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

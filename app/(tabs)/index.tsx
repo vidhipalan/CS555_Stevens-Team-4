@@ -85,6 +85,21 @@ export default function HomeScreen() {
             </View>
           </Pressable>
         </Link>
+
+        {/* Ask a Clinician Button */}
+        <Link href={("/(tabs)/messaging" as unknown as any)} asChild>
+          <Pressable style={styles.featureButton}>
+            <View style={styles.buttonContent}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="chatbubble-ellipses-outline" size={24} color="#34C759" />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={styles.buttonTitle}>Ask a Clinician</Text>
+                <Text style={styles.buttonDescription}>Message your clinician for support and questions</Text>
+              </View>
+            </View>
+          </Pressable>
+        </Link>
       </View>
     </ScrollView>
   );

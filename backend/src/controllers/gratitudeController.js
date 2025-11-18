@@ -59,8 +59,6 @@ const getGratitudeEntry = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // CODE SMELL: Duplicate Code - ObjectId Validation
-    // This same validation code appears in: getGratitudeEntry(), updateGratitudeEntry(), deleteGratitudeEntry()
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid entry ID' });
     }
@@ -86,15 +84,11 @@ const createGratitudeEntry = async (req, res) => {
     const { title, content, tags, mood, isDraft, date } = req.body;
     const userId = req.user.id;
 
-    // CODE SMELL: Duplicate Code - Content Validation
-    // This same validation code appears in: createGratitudeEntry(), updateGratitudeEntry()
     // Validate content length
     if (content && content.length > 2000) {
       return res.status(400).json({ error: 'Content exceeds 2000 character limit' });
     }
 
-    // CODE SMELL: Duplicate Code - Title Validation
-    // This same validation code appears in: createGratitudeEntry(), updateGratitudeEntry()
     // Validate title length
     if (title && title.length > 100) {
       return res.status(400).json({ error: 'Title exceeds 100 character limit' });
@@ -135,21 +129,15 @@ const updateGratitudeEntry = async (req, res) => {
     const { title, content, tags, mood, isDraft, date } = req.body;
     const userId = req.user.id;
 
-    // CODE SMELL: Duplicate Code - ObjectId Validation
-    // This same validation code appears in: getGratitudeEntry(), updateGratitudeEntry(), deleteGratitudeEntry()
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid entry ID' });
     }
 
-    // CODE SMELL: Duplicate Code - Content Validation
-    // This same validation code appears in: createGratitudeEntry(), updateGratitudeEntry()
     // Validate content length
     if (content && content.length > 2000) {
       return res.status(400).json({ error: 'Content exceeds 2000 character limit' });
     }
 
-    // CODE SMELL: Duplicate Code - Title Validation
-    // This same validation code appears in: createGratitudeEntry(), updateGratitudeEntry()
     // Validate title length
     if (title && title.length > 100) {
       return res.status(400).json({ error: 'Title exceeds 100 character limit' });
@@ -191,8 +179,6 @@ const deleteGratitudeEntry = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
-    // CODE SMELL: Duplicate Code - ObjectId Validation
-    // This same validation code appears in: getGratitudeEntry(), updateGratitudeEntry(), deleteGratitudeEntry()
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ error: 'Invalid entry ID' });
     }

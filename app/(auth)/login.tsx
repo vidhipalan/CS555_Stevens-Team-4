@@ -36,14 +36,14 @@ export default function Login() {
       let response;
       try {
         response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(values),
-          signal: controller.signal,
-        });
-        clearTimeout(t);
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+        signal: controller.signal,
+      });
+      clearTimeout(t);
       } catch (fetchError: any) {
         clearTimeout(t);
         if (fetchError.name === 'AbortError') {

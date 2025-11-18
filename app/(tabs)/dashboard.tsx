@@ -104,24 +104,39 @@ export default function DashboardScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerTitleContainer}>
           <Text style={styles.title}>Clinician Dashboard</Text>
           <Text style={styles.subtitle}>Welcome, {email || 'Doctor'}</Text>
         </View>
-        <TouchableOpacity
-          style={styles.meetingRequestsButton}
-          onPress={() => {
-            // Security: Only allow clinicians to access meeting requests
-            if (userRole === 'clinician') {
-              router.push('/(tabs)/meeting-requests' as any);
-            } else {
-              Alert.alert('Access Denied', 'Only clinicians can view meeting requests.');
-            }
-          }}
-        >
-          <Ionicons name="mail" size={20} color="#007AFF" />
-          <Text style={styles.meetingRequestsButtonText}>Requests</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtonsContainer}>
+          <TouchableOpacity
+            style={styles.meetingRequestsButton}
+            onPress={() => {
+              // Security: Only allow clinicians to access meeting requests
+              if (userRole === 'clinician') {
+                router.push('/(tabs)/meeting-requests' as any);
+              } else {
+                Alert.alert('Access Denied', 'Only clinicians can view meeting requests.');
+              }
+            }}
+          >
+            <Ionicons name="mail" size={18} color="#fff" />
+            <Text style={styles.meetingRequestsButtonText}>Requests</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.messagingButton}
+            onPress={() => {
+              if (userRole === 'clinician') {
+                router.push('/(tabs)/messaging' as any);
+              } else {
+                Alert.alert('Access Denied', 'Only clinicians can access messaging.');
+              }
+            }}
+          >
+            <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
+            <Text style={styles.messagingButtonText}>Messages</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.statsContainer}>
@@ -181,23 +196,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    paddingRight: 16,
+  },
+  headerButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    flexShrink: 0,
   },
   meetingRequestsButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 8,
   },
+  messagingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
   meetingRequestsButtonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    marginLeft: 6,
+    marginLeft: 4,
+  },
+  messagingButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   title: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: '800',
     color: '#fff',
     marginBottom: 4,

@@ -14,15 +14,11 @@ function toUtcDateOnlyFromInput(input) {
   return new Date(Date.UTC(y, m, d));
 }
 
-// Date validation error message constant - REFACTORED: Replace Magic String with Symbolic Constant
-const DATE_FORMAT_ERROR = 'Invalid date format. Use YYYY-MM-DD.';
-
 exports.getByDate = async (req, res) => {
   try {
     const dateOnly = toUtcDateOnlyFromInput(req.query.date);
     if (req.query.date && !dateOnly) {
-      // REFACTORED: Magic string replaced with constant DATE_FORMAT_ERROR
-      return res.status(400).json({ error: DATE_FORMAT_ERROR });
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
     const mood = await Mood.findOne({ userId: req.user.id, date: dateOnly });
     return res.json(mood || null);
@@ -40,8 +36,7 @@ exports.createOrUpdateByDate = async (req, res) => {
     }
     const dateOnly = toUtcDateOnlyFromInput(date);
     if (date && !dateOnly) {
-      // REFACTORED: Magic string replaced with constant DATE_FORMAT_ERROR
-      return res.status(400).json({ error: DATE_FORMAT_ERROR });
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
     }
 
     const existing = await Mood.findOne({ userId: req.user.id, date: dateOnly });

@@ -34,4 +34,9 @@ export const API_ENDPOINTS = {
     CANCEL_REQUEST: (requestId: string) => `${API_URL}/api/meetings/cancel-request/${requestId}`,
     CANCEL: (meetingId: string) => `${API_URL}/api/meetings/cancel/${meetingId}`,
   },
+  ROCKETCHAT: {
+    LOGIN: `${API_URL}/api/rocketchat/login`,
+    CREATE_DM: `${API_URL}/api/rocketchat/create-dm`,
+    CONTACTS: `${API_URL}/api/rocketchat/contacts`,
+  },
 };

@@ -1,24 +1,25 @@
 import {
-    cancelMeeting,
-    cancelMeetingRequest,
-    getMeetings,
-    getMyMeetingRequests,
-    Meeting,
-    MeetingRequest
+  cancelMeeting,
+  cancelMeetingRequest,
+  getMeetings,
+  getMyMeetingRequests,
+  Meeting,
+  MeetingRequest
 } from '@/app/api/meetings';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Linking,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Linking,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 type MeetingItem = Meeting | (MeetingRequest & { type: 'request' });
@@ -44,6 +45,18 @@ export default function MeetingsScreen() {
       }
     }
   }, [userRole]);
+
+  // Refresh meetings when screen comes into focus (e.g., after accepting a meeting)
+  useFocusEffect(
+    useCallback(() => {
+      if (userRole) {
+        loadMeetings();
+        if (userRole === 'patient') {
+          loadMeetingRequests();
+        }
+      }
+    }, [userRole])
+  );
 
   const loadUserRole = async () => {
     const role = await SecureStore.getItemAsync('user_role');
