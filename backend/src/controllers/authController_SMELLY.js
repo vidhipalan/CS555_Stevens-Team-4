@@ -1,3 +1,19 @@
+/*
+ * SMELLY CODE - CODE SMELL #2: DUPLICATE AUTHORIZATION CHECK
+ *
+ * This file contains duplicate clinician role authorization check.
+ * The same authorization logic appears in:
+ * 1. authController.js (getAllPatients function)
+ * 2. moodController.js (getAllPatientsMoods function)
+ * 3. gratitudeController.js (getAllPatientsGratitude function)
+ *
+ * This violates the DRY (Don't Repeat Yourself) principle.
+ * If the authorization logic changes, we need to update multiple places.
+ *
+ * Refactoring Method: Extract Method / Middleware Pattern
+ * Solution: Create a reusable middleware function for clinician authorization
+ */
+
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
@@ -118,10 +134,17 @@ exports.getCurrentUser = async (req, res) => {
 // @route   GET /api/auth/patients
 // @desc    Get all patients (clinicians only)
 // @access  Private
-// REFACTORED: Removed duplicate clinician authorization check
-// Authorization is now handled by requireClinician middleware in routes
 exports.getAllPatients = async (req, res) => {
   try {
+    // *** CODE SMELL #2: Duplicate clinician authorization check ***
+    // This same logic appears in moodController.js and gratitudeController.js
+    // Check if requesting user is a clinician
+    const requestingUser = await User.findById(req.user.id);
+    if (!requestingUser || requestingUser.role !== 'clinician') {
+      return res.status(403).json({ error: 'Access denied. Clinicians only.' });
+    }
+    // *** END OF DUPLICATE AUTHORIZATION CODE SMELL ***
+
     // Get all patients
     const patients = await User.find({ role: 'patient' }).select('-password');
     

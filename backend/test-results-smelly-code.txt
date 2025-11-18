@@ -1,0 +1,31 @@
+
+> backend@1.0.0 test
+> jest --runInBand gratitude.test.js
+
+PASS tests/gratitude.test.js (10.875 s)
+  Gratitude API - Create Entry Validation
+    √ should reject gratitude entry with content exceeding 2000 characters (709 ms)
+    √ should reject gratitude entry with title exceeding 100 characters (292 ms)
+    √ should accept gratitude entry with content at 2000 characters (281 ms)
+    √ should accept gratitude entry with title at 100 characters (309 ms)
+  Gratitude API - Update Entry Validation
+    √ should reject update with content exceeding 2000 characters (310 ms)
+    √ should reject update with title exceeding 100 characters (301 ms)
+    √ should accept update with content at 2000 characters (335 ms)
+    √ should accept update with title at 100 characters (303 ms)
+  Gratitude API - Clinician Access
+    √ should allow clinician to view all patient gratitude entries (655 ms)
+    √ should deny patient access to all-patients gratitude endpoint (579 ms)
+    √ should deny unauthenticated access to all-patients gratitude endpoint (517 ms)
+  Mood API - Clinician Access
+    √ should allow clinician to view all patient moods (523 ms)
+    √ should deny patient access to all-patients mood endpoint (493 ms)
+  Auth API - Clinician Access to Patients
+    √ should allow clinician to view all patients (555 ms)
+    √ should deny patient access to all patients endpoint (505 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       15 passed, 15 total
+Snapshots:   0 total
+Time:        11.148 s, estimated 12 s
+Ran all test suites matching gratitude.test.js.
