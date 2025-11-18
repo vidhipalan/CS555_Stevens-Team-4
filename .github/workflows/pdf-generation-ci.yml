@@ -55,6 +55,7 @@ jobs:
           MONGODB_URI: mongodb://localhost:27017/test-db
           JWT_SECRET: test-secret-key
           NODE_ENV: test
+        continue-on-error: false
       
       - name: Verify PDF generation functionality
         working-directory: ./backend
