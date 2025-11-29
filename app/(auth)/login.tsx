@@ -67,9 +67,9 @@ export default function Login() {
 
       // Route based on role
       if (data.user.role === 'clinician') {
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/dashboard' as any);
       } else {
-        router.replace('/(tabs)');
+        router.replace('/(tabs)' as any);
       }
     } catch (e: any) {
       console.error('Login error:', e);
@@ -157,7 +157,7 @@ export default function Login() {
 
           <View style={styles.signupContainer}>
             <Text style={styles.signupText}>Don't have an account? </Text>
-            <Link href="/(auth)/signup" asChild>
+            <Link href={"/(auth)/signup" as any} asChild>
               <Pressable>
                 <Text style={styles.signupLink}>Create Account</Text>
               </Pressable>

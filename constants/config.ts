@@ -14,6 +14,9 @@ export const API_ENDPOINTS = {
     LOGIN: `${API_URL}/api/auth/login`,
     ME: `${API_URL}/api/auth/me`,
     PATIENTS: `${API_URL}/api/auth/patients`,
+    ALL_PATIENTS: `${API_URL}/api/auth/all-patients`,
+    ASSIGN_PATIENT: `${API_URL}/api/auth/assign-patient`,
+    UNASSIGN_PATIENT: `${API_URL}/api/auth/unassign-patient`,
   },
   MOODS: {
     ALL_PATIENTS: `${API_URL}/api/moods/all-patients`,

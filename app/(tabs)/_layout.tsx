@@ -34,7 +34,7 @@ export default function TabLayout() {
         options={{
           title: 'Dashboard',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="chart.bar.fill" color={color} />,
-          href: isClinician ? '/dashboard' : null,
+          href: isClinician ? undefined : null,
         }}
       />
       {/* Home - For patients, hidden for clinicians */}
@@ -43,7 +43,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-          href: !isClinician ? '/' : null,
+          href: !isClinician ? undefined : null,
         }}
       />
       <Tabs.Screen
