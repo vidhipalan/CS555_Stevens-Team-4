@@ -116,18 +116,114 @@ exports.getCurrentUser = async (req, res) => {
 };
 
 // @route   GET /api/auth/patients
-// @desc    Get all patients (clinicians only)
+// @desc    Get assigned patients for current clinician (clinicians only)
 // @access  Private
 // REFACTORED: Removed duplicate clinician authorization check
 // Authorization is now handled by requireClinician middleware in routes
 exports.getAllPatients = async (req, res) => {
   try {
-    // Get all patients
-    const patients = await User.find({ role: 'patient' }).select('-password');
+    // Get only patients assigned to the current clinician
+    const patients = await User.find({ 
+      role: 'patient',
+      assignedClinicianId: req.user.id 
+    }).select('-password');
     
     res.json(patients);
   } catch (error) {
     console.error('Get all patients error:', error);
     res.status(500).json({ error: 'Error fetching patients' });
+  }
+};
+
+// @route   GET /api/auth/all-patients
+// @desc    Get all patients (for assignment purposes, clinicians only)
+// @access  Private
+exports.getAllPatientsForAssignment = async (req, res) => {
+  try {
+    // Get all patients (including unassigned ones) for assignment UI
+    const patients = await User.find({ role: 'patient' })
+      .select('-password')
+      .populate('assignedClinicianId', 'email');
+    
+    res.json(patients);
+  } catch (error) {
+    console.error('Get all patients for assignment error:', error);
+    res.status(500).json({ error: 'Error fetching patients' });
+  }
+};
+
+// @route   POST /api/auth/assign-patient
+// @desc    Assign a patient to the current clinician
+// @access  Private (clinicians only)
+exports.assignPatient = async (req, res) => {
+  try {
+    const { patientId } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({ error: 'Patient ID is required' });
+    }
+
+    // Verify the patient exists and is actually a patient
+    const patient = await User.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+    if (patient.role !== 'patient') {
+      return res.status(400).json({ error: 'User is not a patient' });
+    }
+
+    // Assign patient to current clinician
+    patient.assignedClinicianId = req.user.id;
+    await patient.save();
+
+    res.json({ 
+      message: 'Patient assigned successfully',
+      patient: {
+        id: patient._id,
+        email: patient.email,
+        assignedClinicianId: patient.assignedClinicianId
+      }
+    });
+  } catch (error) {
+    console.error('Assign patient error:', error);
+    res.status(500).json({ error: 'Error assigning patient' });
+  }
+};
+
+// @route   POST /api/auth/unassign-patient
+// @desc    Unassign a patient from the current clinician
+// @access  Private (clinicians only)
+exports.unassignPatient = async (req, res) => {
+  try {
+    const { patientId } = req.body;
+
+    if (!patientId) {
+      return res.status(400).json({ error: 'Patient ID is required' });
+    }
+
+    // Verify the patient exists and is assigned to this clinician
+    const patient = await User.findById(patientId);
+    if (!patient) {
+      return res.status(404).json({ error: 'Patient not found' });
+    }
+    if (patient.assignedClinicianId?.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ error: 'Patient is not assigned to you' });
+    }
+
+    // Unassign patient
+    patient.assignedClinicianId = null;
+    await patient.save();
+
+    res.json({ 
+      message: 'Patient unassigned successfully',
+      patient: {
+        id: patient._id,
+        email: patient.email,
+        assignedClinicianId: null
+      }
+    });
+  } catch (error) {
+    console.error('Unassign patient error:', error);
+    res.status(500).json({ error: 'Error unassigning patient' });
   }
 };

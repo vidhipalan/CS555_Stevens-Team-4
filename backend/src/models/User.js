@@ -22,6 +22,11 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     default: 'patient',
   },
+  assignedClinicianId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

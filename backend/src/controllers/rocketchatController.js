@@ -375,11 +375,19 @@ exports.getContacts = async (req, res) => {
 
     let contacts = [];
     if (user.role === 'patient') {
-      // Get all clinicians
-      contacts = await User.find({ role: 'clinician' }).select('email _id');
+      // Get only the assigned clinician for this patient
+      if (user.assignedClinicianId) {
+        const clinician = await User.findById(user.assignedClinicianId).select('email _id');
+        if (clinician) {
+          contacts = [clinician];
+        }
+      }
     } else if (user.role === 'clinician') {
-      // Get all patients
-      contacts = await User.find({ role: 'patient' }).select('email _id');
+      // Get only patients assigned to this clinician
+      contacts = await User.find({ 
+        role: 'patient',
+        assignedClinicianId: req.user.id 
+      }).select('email _id');
     }
 
     res.json(contacts);
