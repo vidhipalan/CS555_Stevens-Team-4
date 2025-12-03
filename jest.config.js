@@ -17,6 +17,6 @@ module.exports = {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest'
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo|@expo)/)'
-  ]
+    'node_modules/(?!(expo|@expo)/)'
+  ],
 };

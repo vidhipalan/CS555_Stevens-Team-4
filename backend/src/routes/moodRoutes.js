@@ -5,6 +5,7 @@ const { requireClinician } = require('../middleware/roleAuth');
 const moodController = require('../controllers/moodController');
 
 // REFACTORED: Using requireClinician middleware for role-based authorization
+// Note: auth middleware must come before requireClinician
 router.get('/all-patients', auth, requireClinician, moodController.getAllPatientsMoods);
 router.get('/today', auth, moodController.getByDate);
 router.post('/', auth, moodController.createOrUpdateByDate);

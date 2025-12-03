@@ -29,39 +29,92 @@ const getAuthHeaders = async () => {
 };
 
 export const getRocketChatLogin = async (): Promise<RocketChatLogin> => {
-  const headers = await getAuthHeaders();
-  const response = await fetch(API_ENDPOINTS.ROCKETCHAT.LOGIN, {
-    headers,
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to get Rocket.Chat credentials');
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(API_ENDPOINTS.ROCKETCHAT.LOGIN, {
+      headers,
+    });
+    
+    if (!response.ok) {
+      let errorMessage = 'Failed to get Rocket.Chat credentials';
+      try {
+        const error = await response.json();
+        errorMessage = error.error || error.message || errorMessage;
+      } catch (e) {
+        errorMessage = `Server error: ${response.status} ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    if (!data || !data.serverUrl) {
+      throw new Error('Invalid response from Rocket.Chat server');
+    }
+    return data;
+  } catch (error: any) {
+    console.error('Error in getRocketChatLogin:', error);
+    throw error instanceof Error ? error : new Error(error?.message || 'Failed to get Rocket.Chat credentials');
   }
-  return response.json();
 };
 
 export const createDirectMessage = async (otherUserId: string): Promise<DirectMessageRoom> => {
-  const headers = await getAuthHeaders();
-  const response = await fetch(API_ENDPOINTS.ROCKETCHAT.CREATE_DM, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ otherUserId }),
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Failed to create direct message');
+  try {
+    if (!otherUserId) {
+      throw new Error('Other user ID is required');
+    }
+    
+    const headers = await getAuthHeaders();
+    const response = await fetch(API_ENDPOINTS.ROCKETCHAT.CREATE_DM, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ otherUserId }),
+    });
+    
+    if (!response.ok) {
+      let errorMessage = 'Failed to create direct message';
+      try {
+        const error = await response.json();
+        errorMessage = error.error || error.message || errorMessage;
+      } catch (e) {
+        errorMessage = `Server error: ${response.status} ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    if (!data || (!data.roomName && !data.roomId)) {
+      throw new Error('Invalid response: missing room information');
+    }
+    return data;
+  } catch (error: any) {
+    console.error('Error in createDirectMessage:', error);
+    throw error instanceof Error ? error : new Error(error?.message || 'Failed to create direct message');
   }
-  return response.json();
 };
 
 export const getContacts = async (): Promise<Contact[]> => {
-  const headers = await getAuthHeaders();
-  const response = await fetch(API_ENDPOINTS.ROCKETCHAT.CONTACTS, {
-    headers,
-  });
-  if (!response.ok) {
-    throw new Error('Failed to fetch contacts');
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(API_ENDPOINTS.ROCKETCHAT.CONTACTS, {
+      headers,
+    });
+    
+    if (!response.ok) {
+      let errorMessage = 'Failed to fetch contacts';
+      try {
+        const error = await response.json();
+        errorMessage = error.error || error.message || errorMessage;
+      } catch (e) {
+        errorMessage = `Server error: ${response.status} ${response.statusText}`;
+      }
+      throw new Error(errorMessage);
+    }
+    
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error: any) {
+    console.error('Error in getContacts:', error);
+    throw error instanceof Error ? error : new Error(error?.message || 'Failed to fetch contacts');
   }
-  return response.json();
 };
 

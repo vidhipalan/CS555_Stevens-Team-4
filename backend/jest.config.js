@@ -5,5 +5,6 @@ module.exports = {
   verbose: true,
   forceExit: true,
   detectOpenHandles: true,
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 };
 
