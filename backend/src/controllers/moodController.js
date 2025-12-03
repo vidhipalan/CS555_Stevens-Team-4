@@ -65,8 +65,6 @@ exports.getHistory = async (req, res) => {
   }
 };
 
-// REFACTORED: Removed duplicate clinician authorization check
-// Authorization is now handled by requireClinician middleware in routes
 exports.getAllPatientsMoods = async (req, res) => {
   try {
     const User = require('../models/User');
