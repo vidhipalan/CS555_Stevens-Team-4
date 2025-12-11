@@ -1,9 +1,11 @@
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { getToday, saveToday } from '@/app/api/moods';
+import { getToday, saveToday } from '@/lib/api/moods';
 
 type MoodKey = 'happy' | 'neutral' | 'sad' | 'angry' | 'anxious' | 'excited' | 'tired';
 
@@ -24,6 +26,16 @@ export default function LogMoodScreen() {
   const [saving, setSaving] = useState(false);
   const [exists, setExists] = useState(false);
   const [selected, setSelected] = useState<MoodKey | null>(null);
+
+  const handleBack = async () => {
+    // Get user role to navigate to correct screen
+    const userRole = await SecureStore.getItemAsync('user_role');
+    if (userRole === 'clinician') {
+      router.replace('/(tabs)/dashboard' as any);
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  };
   const [date, setDate] = useState<string>(() => {
     const now = new Date();
     const y = now.getFullYear();
@@ -32,7 +44,35 @@ export default function LogMoodScreen() {
     return `${y}-${m}-${d}`;
   });
   const [note, setNote] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
   const disabled = useMemo(() => saving || !selected || exists, [saving, selected, exists]);
+
+  // Reset screen to today's date when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      const resetToToday = () => {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const today = `${y}-${m}-${d}`;
+        
+        setDate(today);
+        setSelectedYear(y);
+        setSelectedMonth(now.getMonth() + 1); // Number, not string
+        setSelectedDay(now.getDate()); // Number, not string
+        setSelected(null);
+        setNote('');
+        setExists(false);
+        setShowDatePicker(false);
+      };
+      
+      resetToToday();
+    }, [])
+  );
 
   useEffect(() => {
     const init = async () => {
@@ -65,8 +105,20 @@ export default function LogMoodScreen() {
     setSaving(true);
     try {
       await saveToday(token, selected, note.trim(), date);
+      // Get user role to navigate to correct screen
+      const userRole = await SecureStore.getItemAsync('user_role');
       Alert.alert('Saved', "Today's mood has been logged.", [
-        { text: 'OK', onPress: () => router.replace('/(tabs)') },
+        { 
+          text: 'OK', 
+          onPress: () => {
+            // Navigate to home screen based on role
+            if (userRole === 'clinician') {
+              router.replace('/(tabs)/dashboard' as any);
+            } else {
+              router.replace('/(tabs)' as any);
+            }
+          }
+        },
       ]);
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to save mood');
@@ -85,7 +137,14 @@ export default function LogMoodScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Log Mood</Text>
+      <View style={styles.header}>
+        <Pressable onPress={handleBack} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#111827" />
+        </Pressable>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Log Mood</Text>
+        </View>
+      </View>
       <Text style={styles.label}>Select date</Text>
       <View style={styles.dateRow}>
         {getLastNDays(7).map((d) => (
@@ -97,7 +156,144 @@ export default function LogMoodScreen() {
             <Text style={[styles.chipText, d === date && styles.chipTextActive]}>{formatChip(d)}</Text>
           </Pressable>
         ))}
+        <Pressable
+          style={[styles.chip, styles.chipCustom, !getLastNDays(7).includes(date) && styles.chipCustomActive]}
+          onPress={() => {
+            // Initialize picker with current selected date
+            // Parse YYYY-MM-DD format correctly
+            const [y, m, d] = date.split('-').map(Number);
+            setSelectedYear(y);
+            setSelectedMonth(m);
+            setSelectedDay(d);
+            setShowDatePicker(true);
+          }}
+        >
+          <Ionicons name="calendar-outline" size={16} color={!getLastNDays(7).includes(date) ? "#fff" : "#6366F1"} style={{ marginRight: 4 }} />
+          <Text style={[styles.chipText, !getLastNDays(7).includes(date) && { color: '#fff' }]}>
+            {!getLastNDays(7).includes(date) ? formatChip(date) : 'Other Date'}
+          </Text>
+        </Pressable>
       </View>
+      
+      {/* Date Picker Modal */}
+      <Modal
+        visible={showDatePicker}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Date</Text>
+              <Pressable onPress={() => setShowDatePicker(false)}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </Pressable>
+            </View>
+            
+            <View style={styles.pickerContainer}>
+              <View style={styles.pickerGroup}>
+                <Text style={styles.pickerLabel}>Month</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={selectedMonth}
+                    onValueChange={(value: number) => {
+                      setSelectedMonth(value);
+                      // Adjust day if it's invalid for the new month
+                      const daysInMonth = new Date(selectedYear, value, 0).getDate();
+                      if (selectedDay > daysInMonth) {
+                        setSelectedDay(daysInMonth);
+                      }
+                    }}
+                    style={styles.picker}
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                      <Picker.Item
+                        key={month}
+                        label={new Date(2000, month - 1, 1).toLocaleDateString('en-US', { month: 'long' })}
+                        value={month}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+              
+              <View style={styles.pickerGroup}>
+                <Text style={styles.pickerLabel}>Day</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={selectedDay}
+                    onValueChange={setSelectedDay}
+                    style={styles.picker}
+                  >
+                    {Array.from(
+                      { length: new Date(selectedYear, selectedMonth, 0).getDate() },
+                      (_, i) => i + 1
+                    ).map((day) => (
+                      <Picker.Item key={day} label={String(day)} value={day} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+              
+              <View style={styles.pickerGroup}>
+                <Text style={styles.pickerLabel}>Year</Text>
+                <View style={styles.pickerWrapper}>
+                  <Picker
+                    selectedValue={selectedYear}
+                    onValueChange={(value: number) => {
+                      setSelectedYear(value);
+                      // Adjust day if it's invalid for the new year (leap year)
+                      const daysInMonth = new Date(value, selectedMonth, 0).getDate();
+                      if (selectedDay > daysInMonth) {
+                        setSelectedDay(daysInMonth);
+                      }
+                    }}
+                    style={styles.picker}
+                  >
+                    {Array.from(
+                      { length: 100 },
+                      (_, i) => new Date().getFullYear() - i
+                    ).map((year) => (
+                      <Picker.Item key={year} label={String(year)} value={year} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            </View>
+            
+            <Pressable
+              style={styles.modalButton}
+              onPress={async () => {
+                const newDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+                setDate(newDate);
+                setShowDatePicker(false);
+                
+                // Reload mood data for the new date
+                const t = await SecureStore.getItemAsync('auth_token');
+                if (t) {
+                  try {
+                    const existing = await getToday(t, newDate);
+                    if (existing) {
+                      setSelected(existing.mood as MoodKey);
+                      setNote(existing.note || '');
+                      setExists(true);
+                    } else {
+                      setSelected(null);
+                      setNote('');
+                      setExists(false);
+                    }
+                  } catch (_err) {
+                    // ignore; treat as not set
+                  }
+                }
+              }}
+            >
+              <Text style={styles.modalButtonText}>Select Date</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       <Text style={styles.subtitle}>Select the emoji that best represents how you feel.</Text>
 
       <View style={styles.grid}>
@@ -152,11 +348,23 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  backButton: {
+    padding: 4,
+    marginRight: 12,
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
   title: {
     fontSize: 28,
     fontWeight: '800',
     color: '#111827',
-    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
@@ -249,6 +457,77 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#fff',
+  },
+  chipCustom: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#6366F1',
+  },
+  chipCustomActive: {
+    backgroundColor: '#6366F1',
+    borderColor: '#6366F1',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    gap: 12,
+  },
+  pickerGroup: {
+    flex: 1,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 150,
+    backgroundColor: '#F9FAFB',
+  },
+  modalButton: {
+    backgroundColor: '#6366F1',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
   },
 });
 

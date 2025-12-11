@@ -56,6 +56,7 @@ export default function RootLayout() {
             if (userRole === 'clinician') {
               router.replace('/(tabs)/dashboard' as any);
             } else {
+              // For patients, navigate to tabs root which will show index
               router.replace('/(tabs)' as any);
             }
           } 
@@ -64,6 +65,7 @@ export default function RootLayout() {
             if (userRole === 'clinician') {
               router.replace('/(tabs)/dashboard' as any);
             } else {
+              // For patients, navigate to tabs root which will show index
               router.replace('/(tabs)' as any);
             }
           }

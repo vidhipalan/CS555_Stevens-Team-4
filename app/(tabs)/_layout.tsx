@@ -27,7 +27,8 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
         tabBarButton: HapticTab,
-      }}>
+      }}
+      initialRouteName={isClinician ? 'dashboard' : 'index'}>
       {/* Dashboard - Only for clinicians, first tab */}
       <Tabs.Screen
         name="dashboard"

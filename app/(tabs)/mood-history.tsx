@@ -1,11 +1,12 @@
-import { useFocusEffect } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { getHistory } from '@/app/api/moods';
-import { capitalize, emojiFor, formatDate } from '@/app/utils/moodUtils';
-import { shareMoodHistoryPDF } from '@/app/utils/pdfGenerator';
+import { getHistory } from '@/lib/api/moods';
+import { capitalize, emojiFor, formatDate } from '@/lib/utils/moodUtils';
+import { shareMoodHistoryPDF } from '@/lib/utils/pdfGenerator';
 
 type MoodItem = {
   _id: string;
@@ -15,18 +16,36 @@ type MoodItem = {
 };
 
 export default function MoodHistoryScreen() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<MoodItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
 
+  const handleBack = async () => {
+    // Get user role to navigate to correct screen
+    const userRole = await SecureStore.getItemAsync('user_role');
+    if (userRole === 'clinician') {
+      router.replace('/(tabs)/dashboard' as any);
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  };
+
   const load = useCallback(async () => {
       setError(null);
+      setLoading(true);
       try {
         const token = await SecureStore.getItemAsync('auth_token');
         if (!token) throw new Error('Not authenticated');
         const data = await getHistory(token, 60);
-        setItems(data || []);
+        // Sort by date descending (newest first)
+        const sorted = (data || []).sort((a: MoodItem, b: MoodItem) => {
+          const dateA = new Date(a.date).getTime();
+          const dateB = new Date(b.date).getTime();
+          return dateB - dateA; // Newest first
+        });
+        setItems(sorted);
       } catch (e: any) {
         setError(e?.message || 'Failed to load history');
       } finally {
@@ -78,6 +97,9 @@ export default function MoodHistoryScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <Pressable onPress={handleBack} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#111827" />
+        </Pressable>
         <Text style={styles.title}>Mood history</Text>
         <TouchableOpacity
           style={[styles.shareButton, isSharing && styles.shareButtonDisabled]}
@@ -121,6 +143,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
+  },
+  backButton: {
+    marginRight: 12,
+    padding: 4,
   },
   title: {
     fontSize: 24,

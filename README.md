@@ -1,161 +1,362 @@
-## 🧠 Mental Health Tracker App
+# 🧠 Mental Health Tracker App
 
-A full-stack mobile and web application designed to support mental wellness through mood tracking, journaling, and secure clinician-patient communication.
+A full-stack mobile application designed to support mental wellness through mood tracking, gratitude journaling, and secure clinician-patient communication. Built with React Native (Expo), Node.js, Express, MongoDB, and Rocket.Chat.
 
-## 🚀 Getting Started
+## 📋 Table of Contents
 
-Follow these steps to set up and run the project on your local machine.
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Project Structure](#project-structure)
+- [Setup Instructions](#setup-instructions)
+  - [Backend Setup](#backend-setup)
+  - [Rocket.Chat Setup](#rocketchat-setup)
+  - [Frontend Setup](#frontend-setup)
+- [Running the Application](#running-the-application)
+- [Environment Variables](#environment-variables)
+- [Troubleshooting](#troubleshooting)
+- [Technology Stack](#technology-stack)
 
-1. Clone the Repository
+## ✨ Features
 
-```bash
-git clone https://github.com/vidhipalan/CS555_Stevens-Team-4.git
-cd CS555_Stevens-Team-4
+### Patient Features
+- **Mood Tracking**: Log daily moods with notes and view mood history
+- **Gratitude Journal**: Write and manage gratitude entries
+- **Secure Messaging**: Direct messaging with assigned clinicians via Rocket.Chat
+- **Meeting Requests**: Request video meetings with clinicians (Jitsi Meet integration)
+- **Profile Management**: View and update profile information
+
+### Clinician Features
+- **Patient Dashboard**: View all assigned patients
+- **Patient Management**: Assign/unassign patients
+- **Patient Details**: View comprehensive patient data (mood history, gratitude entries)
+- **Secure Messaging**: Communicate with patients with unread message counts
+- **Meeting Management**: Approve/decline patient meeting requests
+
+## 🔧 Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js** (v18 or higher)
+- **npm** or **yarn**
+- **MongoDB Atlas** account (or local MongoDB instance)
+- **Docker** and **Docker Compose** (for Rocket.Chat)
+- **Expo CLI** (will be installed during setup)
+- **Expo Go** app on your mobile device (iOS/Android)
+
+## 📁 Project Structure
+
+```
+.
+├── app/                    # React Native app (Expo Router)
+│   ├── (auth)/            # Authentication screens
+│   ├── (tabs)/            # Main app screens
+│   └── _layout.tsx        # Root layout
+├── backend/               # Express.js backend
+│   ├── src/
+│   │   ├── controllers/   # Route controllers
+│   │   ├── models/        # MongoDB models
+│   │   ├── routes/        # API routes
+│   │   ├── middleware/    # Auth middleware
+│   │   └── server.js      # Server entry point
+│   └── package.json
+├── components/            # Reusable React components
+├── constants/            # App constants and config
+├── lib/                  # Utility functions and API clients
+├── docker-compose.yml    # Rocket.Chat setup
+└── package.json          # Frontend dependencies
 ```
 
-2. Backend Setup
+## 🚀 Setup Instructions
 
-Navigate to the backend directory:
+### Backend Setup
 
+1. **Navigate to the backend directory:**
 ```bash
 cd backend
 ```
 
-
-3. Create a .env file in the backend directory and add the following configuration:
-
+2. **Install dependencies:**
 ```bash
+   npm install
+   ```
+
+3. **Create a `.env` file in the `backend` directory:**
+   ```env
+   # MongoDB Configuration
 MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>?retryWrites=true&w=majority
 
 # Server Configuration
-PORT=5000
+   PORT=5050
 NODE_ENV=development
 
 # JWT Secret (change this for production)
 JWT_SECRET=your-secret-key-change-this-in-production
-```
 
-4. Install Backend Dependencies
-```bash
-npm install
-```
+   # Rocket.Chat Configuration
+   ROCKETCHAT_URL=http://localhost:3000
+   ROCKETCHAT_ADMIN_USER=admin
+   ROCKETCHAT_ADMIN_PASSWORD=admin
+   ```
 
-5. Run the Backend Server
+4. **Update the MongoDB URI:**
+   - Sign up for [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) if you don't have an account
+   - Create a cluster and get your connection string
+   - Replace `<username>`, `<password>`, `<cluster>`, and `<database>` in the `MONGODB_URI`
+   - Add your IP address to MongoDB Atlas Network Access whitelist
 
+5. **Start the backend server:**
 ```bash
 npm run dev
 ```
-✅ Make sure the terminal shows a message confirming MongoDB connection (e.g., “Connected to MongoDB”).
 
-6. Mobile Setup (Expo)
+   You should see:
+   ```
+   ✅ Connected to MongoDB
+   🚀 Server running on port 5050
+   ```
+
+### Rocket.Chat Setup
+
+Rocket.Chat is used for secure messaging between patients and clinicians.
+
+1. **Update `docker-compose.yml`:**
+   - Open `docker-compose.yml` in the root directory
+   - Update `ROOT_URL` with your local IP address:
+     ```yaml
+     environment:
+       - ROOT_URL=http://YOUR_IP:3000
+     ```
+
+2. **Find your local IP address:**
+   ```bash
+   # macOS/Linux
+   ifconfig | grep "inet " | grep -v 127.0.0.1
    
-Step 1 — Install Expo Go
-
-Download Expo Go on your mobile device:
-
-iOS: https://apps.apple.com/app/expo-go/id982107779
-
-Android: https://play.google.com/store/apps/details?id=host.exp.exponent
-
-Step 2 — Connect Devices on the Same Network
-
-Make sure:
-
-Your mobile phone and computer are on the same Wi-Fi network.
-
-Step 3 — Find Your Local IP Address
-
-Windows:
-
-```bash
+   # Windows
 ipconfig
 ```
 
-Mac:
-
+3. **Start Rocket.Chat with Docker Compose:**
 ```bash
-ifconfig | grep inet
-```
+   docker-compose up -d
+   ```
 
-Copy your local IP address (e.g., 192.168.1.10)
+4. **Access Rocket.Chat admin panel:**
+   - Open `http://YOUR_IP:3000` in your browser
+   - Complete the initial setup wizard
+   - Create an admin account (use the same credentials as in your `.env` file)
+   - Note: The first startup may take a few minutes
 
-7. Frontend Setup (Expo Project)
+5. **Verify Rocket.Chat is running:**
+   ```bash
+   docker ps
+   ```
+   You should see `rocketchat` and `rocketchat-mongo` containers running.
 
-Open a new terminal window (keep backend running):
+### Frontend Setup
 
+1. **Navigate to the project root:**
 ```bash
 cd ..
 ```
 
-Install Expo CLI and frontend dependencies:
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
+3. **Install Expo CLI globally (if not already installed):**
 ```bash
-npm install expo
+   npm install -g expo-cli
 ```
 
-8. Run the Frontend App
+4. **Find your local IP address:**
+   ```bash
+   # macOS/Linux
+   ifconfig | grep "inet " | grep -v 127.0.0.1
 
-Start the Expo app using your local IP address (replace <IP address> with your actual one):
+   # Windows
+   ipconfig
+   ```
+   Look for your Wi-Fi interface IP (usually starts with `10.x.x.x` or `192.168.x.x`)
 
+5. **Start Expo with your IP address:**
 ```bash
-EXPO_PUBLIC_API_URL="http://<IP address>:5050" npx expo start -c
-```
+   EXPO_PUBLIC_API_URL="http://YOUR_IP:5050" npx expo start -c
+   ```
+   
+   Replace `YOUR_IP` with your actual IP address (e.g., `10.155.206.72`)
 
-Example:
+   **Important Notes:**
+   - Use your Wi-Fi IP, not `localhost` or `127.0.0.1`
+   - The `-c` flag clears the cache
+   - If your IP changes, restart Expo with the new IP
 
-EXPO_PUBLIC_API_URL="http://192.168.1.10:5050" npx expo start -c
+6. **Open the app on your device:**
+   - Install **Expo Go** app on your phone:
+     - [iOS App Store](https://apps.apple.com/app/expo-go/id982107779)
+     - [Android Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent)
+   - Scan the QR code displayed in the terminal
+   - Make sure your phone and computer are on the **same Wi-Fi network**
 
-9. Open the App on Your Mobile
+## 🏃 Running the Application
 
-Scan the QR code displayed in your terminal using the Expo Go app.
+### Development Mode
 
-The app should open and connect to your local backend API.
+1. **Terminal 1 - Backend:**
+   ```bash
+   cd backend
+   npm run dev
+   ```
 
-## ✅ Summary
+2. **Terminal 2 - Rocket.Chat (if not already running):**
+   ```bash
+   docker-compose up -d
+   ```
 
-You should now have:
+3. **Terminal 3 - Frontend:**
+   ```bash
+   EXPO_PUBLIC_API_URL="http://YOUR_IP:5050" npx expo start -c
+   ```
 
-Backend: running at http://localhost:5050
+### Production Mode
 
-Frontend: running on your mobile device via Expo, connected to the backend.
+1. **Backend:**
+   ```bash
+   cd backend
+   npm start
+   ```
 
-## ⚙️ Tech Stack
+2. **Frontend:**
+   Build using Expo's build service or EAS Build.
 
-Frontend: React Native (Expo)
+## 🔐 Environment Variables
 
-Backend: Node.js + Express.js
+### Backend (`.env` file in `backend/` directory)
 
-Database: MongoDB Atlas
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `MONGODB_URI` | MongoDB connection string | `mongodb+srv://user:pass@cluster.mongodb.net/db` |
+| `PORT` | Backend server port | `5050` |
+| `NODE_ENV` | Environment mode | `development` or `production` |
+| `JWT_SECRET` | Secret key for JWT tokens | `your-secret-key` |
+| `ROCKETCHAT_URL` | Rocket.Chat server URL | `http://localhost:3000` |
+| `ROCKETCHAT_ADMIN_USER` | Rocket.Chat admin username | `admin` |
+| `ROCKETCHAT_ADMIN_PASSWORD` | Rocket.Chat admin password | `admin` |
 
-Authentication: JWT (JSON Web Token)
+### Frontend (Command line)
 
-## 🧩 Notes
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `EXPO_PUBLIC_API_URL` | Backend API URL | `http://10.155.206.72:5050` |
 
-Run backend and frontend in two separate terminals.
+**Note:** Expo doesn't support `.env` files directly. You must set `EXPO_PUBLIC_API_URL` when starting Expo.
 
-Use your local IP, not localhost, when testing on a mobile device.
+## 🐛 Troubleshooting
 
-Keep your .env file private (do not commit it).
+### Backend Issues
 
-Ensure your MongoDB Atlas allows your IP in Network Access settings.
+**Problem: MongoDB connection error**
+- ✅ Check your `MONGODB_URI` in `.env`
+- ✅ Verify your IP is whitelisted in MongoDB Atlas
+- ✅ Check your internet connection
 
+**Problem: Port 5050 already in use**
+- ✅ Change `PORT` in `.env` to a different port (e.g., `5051`)
+- ✅ Update `EXPO_PUBLIC_API_URL` accordingly
 
-## 🧰 Troubleshooting
+### Rocket.Chat Issues
 
-1. Expo “Network request failed” Error
+**Problem: Rocket.Chat won't start**
+- ✅ Check Docker is running: `docker ps`
+- ✅ Check logs: `docker-compose logs rocketchat`
+- ✅ Verify `ROOT_URL` in `docker-compose.yml` matches your IP
+- ✅ Restart containers: `docker-compose restart`
 
-Make sure phone and computer are on the same Wi-Fi.
+**Problem: Cannot connect to Rocket.Chat**
+- ✅ Verify Rocket.Chat is accessible at `http://YOUR_IP:3000`
+- ✅ Check admin credentials in backend `.env` match Rocket.Chat admin account
 
-Verify your EXPO_PUBLIC_API_URL.
+### Frontend Issues
 
-Try restarting Expo with -c flag to clear cache.
+**Problem: "Network request failed" or timeout**
+- ✅ Verify backend is running on port 5050
+- ✅ Check `EXPO_PUBLIC_API_URL` matches your current IP
+- ✅ Ensure phone and computer are on the same Wi-Fi network
+- ✅ Try restarting Expo with `-c` flag: `npx expo start -c`
+- ✅ Check firewall settings (port 5050 should be accessible)
 
-2. MongoDB Connection Error
+**Problem: IP address changed**
+- ✅ Find your new IP: `ifconfig | grep "inet " | grep -v 127.0.0.1`
+- ✅ Restart Expo with new IP: `EXPO_PUBLIC_API_URL="http://NEW_IP:5050" npx expo start -c`
+- ✅ Update `ROOT_URL` in `docker-compose.yml` if using Rocket.Chat
 
-Check the .env file and MongoDB URI.
+**Problem: Expo Go app can't connect**
+- ✅ Ensure both devices are on the same Wi-Fi network
+- ✅ Try switching Expo to "LAN" mode (press `s` in Expo terminal)
+- ✅ Check that your firewall allows connections on port 8081 (Expo default)
 
-Whitelist your IP in MongoDB Atlas under Network Access.
+**Problem: "Request timeout" error**
+- ✅ Verify backend server is running
+- ✅ Check backend logs for errors
+- ✅ Increase timeout in `app/(auth)/login.tsx` if needed (currently 15 seconds)
 
-3. QR Code Not Working
+### General Issues
 
-Switch Expo mode from Tunnel to LAN.
+**Problem: Dependencies installation fails**
+- ✅ Clear npm cache: `npm cache clean --force`
+- ✅ Delete `node_modules` and `package-lock.json`, then reinstall
+- ✅ Try using `yarn` instead of `npm`
+
+**Problem: App crashes on startup**
+- ✅ Check Expo and React Native versions compatibility
+- ✅ Clear Expo cache: `npx expo start -c`
+- ✅ Check console logs for specific error messages
+
+## 🛠 Technology Stack
+
+### Frontend
+- **React Native** (v0.81.4) - Mobile framework
+- **Expo** (v54.0.13) - Development platform
+- **Expo Router** (v6.0.11) - File-based routing
+- **TypeScript** - Type safety
+- **React Hook Form** - Form management
+- **Zod** - Schema validation
+
+### Backend
+- **Node.js** - Runtime environment
+- **Express.js** - Web framework
+- **MongoDB** with **Mongoose** - Database and ODM
+- **JWT** - Authentication
+- **bcryptjs** - Password hashing
+
+### Communication
+- **Rocket.Chat** - Real-time messaging platform
+- **Jitsi Meet** - Video conferencing
+
+### Development Tools
+- **Docker** & **Docker Compose** - Containerization
+- **Jest** - Testing framework
+- **ESLint** - Code linting
+- **Nodemon** - Development server auto-reload
+
+## 📝 Additional Notes
+
+- The backend runs on port **5050** by default
+- Rocket.Chat runs on port **3000** by default
+- For physical devices, always use your network IP, not `localhost`
+- Keep backend and frontend running in separate terminal windows
+- MongoDB Atlas requires IP whitelisting for security
+
+## 🤝 Contributing
+
+This is an academic project. For questions or issues, please contact the development team.
+
+## 📄 License
+
+This project is for academic purposes only.
+
+---
+
+**Happy Coding! 🚀**
+

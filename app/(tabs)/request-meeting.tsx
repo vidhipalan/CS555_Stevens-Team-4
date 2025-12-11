@@ -1,17 +1,17 @@
-import { Clinician, createMeetingRequest, getClinicians } from '@/app/api/meetings';
+import { Clinician, createMeetingRequest, getClinicians } from '@/lib/api/meetings';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function RequestMeetingScreen() {
@@ -22,6 +22,16 @@ export default function RequestMeetingScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
+
+  const handleBack = async () => {
+    // Get user role to navigate to correct screen
+    const role = await SecureStore.getItemAsync('user_role');
+    if (role === 'clinician') {
+      router.replace('/(tabs)/dashboard' as any);
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  };
 
   useEffect(() => {
     checkUserRole();
@@ -42,7 +52,7 @@ export default function RequestMeetingScreen() {
       Alert.alert('Access Denied', 'Only patients can request meetings.', [
         {
           text: 'OK',
-          onPress: () => router.back(),
+          onPress: handleBack,
         },
       ]);
       return;
@@ -66,7 +76,7 @@ export default function RequestMeetingScreen() {
     // Security: Double-check user is a patient
     if (userRole !== 'patient') {
       Alert.alert('Access Denied', 'Only patients can request meetings.');
-      router.back();
+      handleBack();
       return;
     }
 
@@ -116,7 +126,7 @@ export default function RequestMeetingScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Request Meeting</Text>

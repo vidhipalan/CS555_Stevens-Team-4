@@ -17,6 +17,20 @@ const validateGratitudeInput = (title, content) => {
   return errors.length > 0 ? errors : null;
 };
 
+// Helper function to parse YYYY-MM-DD date string as UTC date (no timezone conversion)
+// This prevents timezone issues where dates appear one day earlier/later
+const parseDateString = (dateString) => {
+  if (!dateString) return null;
+  // Expect YYYY-MM-DD format
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]) - 1; // JavaScript months are 0-indexed
+  const day = Number(match[3]);
+  // Create date at UTC midnight to avoid timezone conversion issues
+  return new Date(Date.UTC(year, month, day));
+};
+
 // @desc    Get all gratitude entries for a user
 // @route   GET /api/gratitude
 // @access  Private
@@ -38,8 +52,18 @@ const getGratitudeEntries = async (req, res) => {
 
     if (startDate || endDate) {
       query.date = {};
-      if (startDate) query.date.$gte = new Date(startDate);
-      if (endDate) query.date.$lte = new Date(endDate);
+      if (startDate) {
+        const parsedStart = parseDateString(startDate);
+        if (parsedStart) query.date.$gte = parsedStart;
+      }
+      if (endDate) {
+        const parsedEnd = parseDateString(endDate);
+        if (parsedEnd) {
+          // Set to end of day (23:59:59.999 UTC)
+          parsedEnd.setUTCHours(23, 59, 59, 999);
+          query.date.$lte = parsedEnd;
+        }
+      }
     }
 
     if (isDraft !== undefined) {
@@ -120,7 +144,11 @@ const createGratitudeEntry = async (req, res) => {
     };
 
     if (date) {
-      entryData.date = new Date(date);
+      const parsedDate = parseDateString(date);
+      if (!parsedDate) {
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+      }
+      entryData.date = parsedDate;
     }
 
     const entry = new Gratitude(entryData);
@@ -165,7 +193,13 @@ const updateGratitudeEntry = async (req, res) => {
     if (tags !== undefined) updateData.tags = tags;
     if (mood !== undefined) updateData.mood = mood && mood.trim() !== '' ? mood : undefined;
     if (isDraft !== undefined) updateData.isDraft = isDraft;
-    if (date !== undefined) updateData.date = new Date(date);
+    if (date !== undefined) {
+      const parsedDate = parseDateString(date);
+      if (!parsedDate) {
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+      }
+      updateData.date = parsedDate;
+    }
 
     const entry = await Gratitude.findOneAndUpdate(
       { _id: id, user: userId },
@@ -220,9 +254,15 @@ const getGratitudeEntriesByDate = async (req, res) => {
     const { date } = req.params;
     const userId = req.user.id;
 
-    const startDate = new Date(date);
-    const endDate = new Date(date);
-    endDate.setDate(endDate.getDate() + 1);
+    // Parse date string properly to avoid timezone issues
+    const parsedDate = parseDateString(date);
+    if (!parsedDate) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD.' });
+    }
+
+    const startDate = parsedDate;
+    const endDate = new Date(parsedDate);
+    endDate.setUTCDate(endDate.getUTCDate() + 1);
 
     const entries = await Gratitude.find({
       user: userId,
@@ -273,8 +313,18 @@ const getAllPatientsGratitude = async (req, res) => {
 
     if (startDate || endDate) {
       query.date = {};
-      if (startDate) query.date.$gte = new Date(startDate);
-      if (endDate) query.date.$lte = new Date(endDate);
+      if (startDate) {
+        const parsedStart = parseDateString(startDate);
+        if (parsedStart) query.date.$gte = parsedStart;
+      }
+      if (endDate) {
+        const parsedEnd = parseDateString(endDate);
+        if (parsedEnd) {
+          // Set to end of day (23:59:59.999 UTC)
+          parsedEnd.setUTCHours(23, 59, 59, 999);
+          query.date.$lte = parsedEnd;
+        }
+      }
     }
 
     // Execute query with pagination

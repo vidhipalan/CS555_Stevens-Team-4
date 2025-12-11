@@ -5,7 +5,7 @@ import {
   getMyMeetingRequests,
   Meeting,
   MeetingRequest
-} from '@/app/api/meetings';
+} from '@/lib/api/meetings';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
