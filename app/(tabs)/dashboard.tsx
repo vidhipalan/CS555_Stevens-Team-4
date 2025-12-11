@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from '@/constants/config';
+import { getUnreadCount } from '@/lib/api/rocketchat';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
@@ -35,6 +36,7 @@ export default function DashboardScreen() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [allPatients, setAllPatients] = useState<AllPatient[]>([]);
   const [loadingAllPatients, setLoadingAllPatients] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchPatients = async () => {
     try {
@@ -89,13 +91,42 @@ export default function DashboardScreen() {
       }
       
       await fetchPatients();
+      
+      // Load unread message count if clinician
+      if (role === 'clinician') {
+        loadUnreadCount();
+      }
     };
     load();
   }, []);
 
+  // Refresh unread count every 30 seconds
+  useEffect(() => {
+    if (userRole !== 'clinician') return;
+
+    const interval = setInterval(() => {
+      loadUnreadCount();
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [userRole]);
+
+  const loadUnreadCount = async () => {
+    try {
+      const count = await getUnreadCount();
+      setUnreadCount(count);
+    } catch (error) {
+      console.error('Error loading unread count:', error);
+      // Don't show error, just keep count at 0
+    }
+  };
+
   const onRefresh = () => {
     setRefreshing(true);
     fetchPatients();
+    if (userRole === 'clinician') {
+      loadUnreadCount();
+    }
   };
 
   const fetchAllPatients = async () => {
@@ -268,6 +299,11 @@ export default function DashboardScreen() {
           >
             <Ionicons name="chatbubble-ellipses" size={18} color="#fff" />
             <Text style={styles.messagingButtonText}>Messages</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -405,15 +441,13 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#6366F1',
     paddingTop: 40,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingRight: 16,
+    paddingBottom: 24,
   },
   headerButtonsContainer: {
     flexDirection: 'row',
     gap: 8,
-    flexShrink: 0,
+    marginTop: 16,
+    flexWrap: 'wrap',
   },
   meetingRequestsButton: {
     flexDirection: 'row',
@@ -423,17 +457,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
   },
-  messagingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
   headerTitleContainer: {
-    flex: 1,
-    marginRight: 12,
+    width: '100%',
   },
   meetingRequestsButtonText: {
     color: '#fff',
@@ -441,21 +466,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 4,
   },
+  messagingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    position: 'relative',
+  },
   messagingButtonText: {
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
     marginLeft: 4,
   },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     color: '#fff',
-    marginBottom: 4,
+    marginBottom: 8,
+    textAlign: 'left',
   },
   subtitle: {
     fontSize: 16,
     color: '#E0E7FF',
+    textAlign: 'left',
   },
   statsContainer: {
     flexDirection: 'row',

@@ -1,5 +1,4 @@
 // app/(auth)/login.tsx
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { API_ENDPOINTS } from '@/constants/config';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, router } from 'expo-router';
@@ -16,7 +15,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function Login() {
-  const [secure, setSecure] = useState(true);
+  // secure state removed - secureTextEntry disabled for demo screen recording
   const [serverError, setServerError] = useState<string | null>(null);
   const { register, setValue, handleSubmit, formState: { errors, isSubmitting, isValid } } =
     useForm<FormValues>({ resolver: zodResolver(schema), mode: 'onChange' });
@@ -30,8 +29,10 @@ export default function Login() {
         controller.abort();
       }, 15000); // Increased to 15 seconds
       
-      console.log('Attempting to login to:', API_ENDPOINTS.AUTH.LOGIN);
-      console.log('Request body:', { email: values.email, password: '***' });
+      console.log('🔍 DEBUG - Login attempt:');
+      console.log('   API_URL:', API_ENDPOINTS.AUTH.LOGIN);
+      console.log('   EXPO_PUBLIC_API_URL env:', process.env.EXPO_PUBLIC_API_URL || 'NOT SET - using localhost');
+      console.log('   Request body:', { email: values.email, password: '***' });
       
       let response;
       try {
@@ -76,10 +77,25 @@ export default function Login() {
       console.error('Error name:', e?.name);
       console.error('Error message:', e?.message);
       
+      const currentUrl = API_ENDPOINTS.AUTH.LOGIN;
+      const isLocalhost = currentUrl.includes('localhost');
+      
       if (e?.name === 'AbortError' || e?.message?.includes('Aborted')) {
-        setServerError(`Request timeout. Please check:\n1. Backend is running: cd backend && npm run dev\n2. Backend URL: ${API_ENDPOINTS.AUTH.LOGIN}\n3. Same Wi-Fi network\n4. Try: curl ${API_ENDPOINTS.AUTH.LOGIN}`);
+        let errorMsg = `Request timeout!\n\nTrying to connect to:\n${currentUrl}\n\n`;
+        if (isLocalhost) {
+          errorMsg += `⚠️ You're using localhost, which won't work on a physical device!\n\n`;
+          errorMsg += `To fix:\n1. Stop Expo (Ctrl+C)\n2. Run: EXPO_PUBLIC_API_URL="http://10.214.87.72:5050" npx expo start -c\n3. Or update your IP if different\n\n`;
+        }
+        errorMsg += `Check:\n• Backend is running: cd backend && npm run dev\n• Same Wi-Fi network\n• Firewall allows port 5050`;
+        setServerError(errorMsg);
       } else if (e?.message?.includes('Network request failed') || e?.message?.includes('Failed to fetch') || e?.message?.includes('NetworkError')) {
-        setServerError(`Cannot connect to server at ${API_ENDPOINTS.AUTH.LOGIN}\n\nPlease check:\n1. Backend is running on port 5050\n2. Correct IP address (current: 192.168.80.72)\n3. Same Wi-Fi network\n4. Firewall settings\n5. Try: EXPO_PUBLIC_API_URL="http://YOUR_IP:5050" npx expo start -c`);
+        let errorMsg = `Cannot connect to server!\n\nTrying: ${currentUrl}\n\n`;
+        if (isLocalhost) {
+          errorMsg += `⚠️ localhost won't work on physical devices!\n\n`;
+          errorMsg += `Fix: EXPO_PUBLIC_API_URL="http://10.214.87.72:5050" npx expo start -c\n\n`;
+        }
+        errorMsg += `Check:\n• Backend running on port 5050\n• Correct IP (current: 10.214.87.72)\n• Same Wi-Fi network\n• Firewall settings`;
+        setServerError(errorMsg);
       } else {
         setServerError(e?.message || 'Login failed. Please try again.');
       }
@@ -117,16 +133,14 @@ export default function Login() {
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordContainer}>
               <TextInput
-                secureTextEntry={secure}
+                secureTextEntry={false}
                 placeholder="Enter your password"
                 placeholderTextColor="#9CA3AF"
                 style={[styles.input, styles.passwordInput]}
                 onChangeText={(t) => setValue('password', t, { shouldValidate: true })}
                 {...register('password')}
               />
-              <Pressable onPress={() => setSecure(s => !s)} style={styles.toggle}>
-                <IconSymbol name={secure ? 'eye' : 'eye.slash'} size={20} color="#6B7280" />
-              </Pressable>
+              {/* Eye icon removed - secureTextEntry disabled for demo screen recording */}
             </View>
             {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
           </View>
@@ -252,16 +266,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   passwordInput: {
-    paddingRight: 50,
-  },
-  toggle: {
-    position: 'absolute',
-    right: 16,
-    top: 14,
-    padding: 4,
-  },
-  toggleText: {
-    fontSize: 20,
+    // paddingRight removed - no eye icon needed (secureTextEntry disabled for demo)
   },
   error: {
     color: '#EF4444',

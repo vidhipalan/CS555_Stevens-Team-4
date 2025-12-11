@@ -1,23 +1,23 @@
 import {
-    acceptMeetingRequest,
-    getMeetingRequests,
-    MeetingRequest,
-    rejectMeetingRequest,
-} from '@/app/api/meetings';
+  acceptMeetingRequest,
+  getMeetingRequests,
+  MeetingRequest,
+  rejectMeetingRequest,
+} from '@/lib/api/meetings';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    Modal,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  FlatList,
+  Modal,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 export default function MeetingRequestsScreen() {
@@ -30,6 +30,16 @@ export default function MeetingRequestsScreen() {
   const [scheduledTime, setScheduledTime] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [userRole, setUserRole] = useState<string | null>(null);
+
+  const handleBack = async () => {
+    // Get user role to navigate to correct screen
+    const role = await SecureStore.getItemAsync('user_role');
+    if (role === 'clinician') {
+      router.replace('/(tabs)/dashboard' as any);
+    } else {
+      router.replace('/(tabs)' as any);
+    }
+  };
 
   useEffect(() => {
     checkUserRole();
@@ -50,7 +60,7 @@ export default function MeetingRequestsScreen() {
       Alert.alert('Access Denied', 'Only clinicians can view meeting requests.', [
         {
           text: 'OK',
-          onPress: () => router.back(),
+          onPress: handleBack,
         },
       ]);
       return;
@@ -204,7 +214,7 @@ export default function MeetingRequestsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Meeting Requests</Text>

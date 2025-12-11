@@ -2,11 +2,9 @@ const axios = require('axios');
 const User = require('../models/User');
 
 // Rocket.Chat server configuration
-// These should be set in your .env file
 const ROCKETCHAT_URL = process.env.ROCKETCHAT_URL || 'http://localhost:3000';
 const ROCKETCHAT_ADMIN_USER = process.env.ROCKETCHAT_ADMIN_USER || 'admin';
 const ROCKETCHAT_ADMIN_PASSWORD = process.env.ROCKETCHAT_ADMIN_PASSWORD || 'admin';
-const ROCKETCHAT_ADMIN_TOKEN = process.env.ROCKETCHAT_ADMIN_TOKEN || '';
 
 let adminAuthToken = '';
 let adminUserId = '';
@@ -28,22 +26,24 @@ const loginAsAdmin = async () => {
   }
 };
 
-// Sanitize email to create a valid username (RocketChat usernames can't have @ or special chars)
-const sanitizeUsername = (email) => {
-  return email.replace(/[@.]/g, '_').toLowerCase();
+// Build a deterministic RC username from our Mongo user id
+const buildRcUsernameFromId = (appUserId) => {
+  const raw = String(appUserId);
+  const cleaned = raw.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+  return `app_${cleaned}`;
 };
 
-// Get or create Rocket.Chat user
-const getOrCreateRocketChatUser = async (email, name, role) => {
+// Get or create Rocket.Chat user (keyed by our Mongo user id, not by email)
+const getOrCreateRocketChatUser = async (appUserId, email, role) => {
   // Ensure admin is logged in
   if (!adminAuthToken) {
     await loginAsAdmin();
   }
 
-  const username = sanitizeUsername(email);
+  const username = buildRcUsernameFromId(appUserId);
   let existingUser = null;
 
-  // Try to find user by username first
+  // 1) Try to find user by our deterministic username
   try {
     const checkResponse = await axios.get(
       `${ROCKETCHAT_URL}/api/v1/users.info`,
@@ -58,106 +58,40 @@ const getOrCreateRocketChatUser = async (email, name, role) => {
 
     if (checkResponse.data.success && checkResponse.data.user) {
       const foundUser = checkResponse.data.user;
-      // Filter out system users like rocket.cat
-      if (foundUser.username && foundUser.username !== 'rocket.cat' && foundUser._id !== 'rocket.cat') {
+      if (foundUser.username && foundUser.username !== 'rocket.cat') {
         existingUser = foundUser;
-        console.log(`Found existing user by username:`, {
-          _id: existingUser._id,
-          username: existingUser.username,
-          name: existingUser.name,
-          emails: existingUser.emails,
-        });
+        console.log(`Found existing RC user by username: ${username} (${foundUser._id})`);
       }
     }
   } catch (error) {
-    // User not found by username, try by email
-    if (error.response?.status === 400 || error.response?.status === 404) {
-      try {
-        // Try searching by email address in the emails array
-        const emailResponse = await axios.get(
-          `${ROCKETCHAT_URL}/api/v1/users.list`,
-          {
-            params: { 
-              query: JSON.stringify({ 
-                'emails.address': email 
-              }) 
-            },
-            headers: {
-              'X-Auth-Token': adminAuthToken,
-              'X-User-Id': adminUserId,
-            },
-          }
-        );
-
-        if (emailResponse.data.success && emailResponse.data.users && emailResponse.data.users.length > 0) {
-          // Filter out system users and find the actual user
-          const realUsers = emailResponse.data.users.filter(
-            (user) => user.username !== 'rocket.cat' && user._id !== 'rocket.cat'
-          );
-          
-          if (realUsers.length > 0) {
-            // Find user with matching email
-            const matchingUser = realUsers.find((user) => 
-              user.emails && user.emails.some((e) => e.address === email)
-            ) || realUsers[0];
-            
-            existingUser = matchingUser;
-            console.log(`Found existing user by email:`, {
-              _id: existingUser._id,
-              username: existingUser.username,
-              name: existingUser.name,
-              emails: existingUser.emails,
-            });
-          } else {
-            console.log(`Email search returned only system users, user ${email} not found`);
-          }
-        }
-      } catch (emailError) {
-        // User doesn't exist, will create below
-        console.log(`User ${email} not found, will create new user`);
-      }
-    }
+    console.log(
+      `RC user not found by username ${username}, will create`,
+      error.response?.data || error.message
+    );
   }
 
-  // If user exists, we need to handle authentication
-  // Try to reset password and log in to get auth token
+  // 2) If user exists, just return their info (we'll use admin token for API calls)
   if (existingUser) {
-    // Extract the correct username - use username field, or fallback to sanitized email
-    const existingUsername = existingUser.username || existingUser.name || username;
-    
-    console.log(`User ${email} exists in RocketChat with username: ${existingUsername}, userId: ${existingUser._id}`);
-    
-    // For existing users, we cannot automatically authenticate them because:
-    // 1. Password update requires TOTP (2FA) which we don't have
-    // 2. Admin cannot create tokens for other users
-    // 3. We cannot reset passwords without the old password
-    
-    // The best approach is to return user info without token
-    // The frontend will open RocketChat homepage and user can log in manually
-    // Admin will still be able to create DMs for them
-    console.log(`User ${email} exists in RocketChat - manual login required`);
-    console.log(`Username: ${existingUsername}, UserId: ${existingUser._id}`);
-    
     return {
+      username: existingUser.username,
       userId: existingUser._id,
-      username: existingUsername,
-      authToken: null, // User will need to log in manually
+      authToken: null,
     };
   }
 
-  // User doesn't exist, create it
+  // 3) Create new Rocket.Chat user for this app user id
+  console.log(`RC user ${username} not found, creating new user for app user ${appUserId}...`);
   try {
-    const password = `rc_${Date.now()}_${Math.random().toString(36).substring(7)}`; // Generate a secure password
+    const password = Math.random().toString(36).slice(-12) + 'A1!'; // strong random password
     const createResponse = await axios.post(
       `${ROCKETCHAT_URL}/api/v1/users.create`,
       {
         email,
-        name: name || email,
-        username: username,
+        name: email,
+        username,
         password,
         roles: ['user'],
         verified: true,
-        active: true,
       },
       {
         headers: {
@@ -167,57 +101,26 @@ const getOrCreateRocketChatUser = async (email, name, role) => {
       }
     );
 
-    if (!createResponse.data.success) {
-      console.error('RocketChat user creation failed:', createResponse.data);
-      throw new Error(createResponse.data.error || 'Failed to create Rocket.Chat user');
-    }
-
-    const createdUser = createResponse.data.user;
-
-    // Login as the new user to get their auth token
-    try {
-      const loginResponse = await axios.post(`${ROCKETCHAT_URL}/api/v1/login`, {
-        user: username,
-        password,
-      });
-
-      if (loginResponse.data.success && loginResponse.data.data) {
-        return {
-          userId: loginResponse.data.data.userId,
-          username: createdUser.username || username,
-          authToken: loginResponse.data.data.authToken,
-        };
-      }
-    } catch (loginError) {
-      console.error('Error logging in new user:', loginError.response?.data || loginError.message);
-      // Return user info even if login fails
+    if (createResponse.data.success && createResponse.data.user) {
+      const newUser = createResponse.data.user;
+      console.log(`✅ Created RC user ${username} (${newUser._id}) for app user ${appUserId}`);
       return {
-        userId: createdUser._id,
-        username: createdUser.username || username,
+        username: newUser.username,
+        userId: newUser._id,
         authToken: null,
       };
     }
 
-    return {
-      userId: createdUser._id,
-      username: createdUser.username || username,
-      authToken: null,
-    };
-  } catch (createError) {
-    console.error('Error creating Rocket.Chat user:', {
-      status: createError.response?.status,
-      data: createError.response?.data,
-      message: createError.message,
-    });
-    
-    // Provide more detailed error message
-    const errorMsg = createError.response?.data?.error || createError.message || 'Failed to create Rocket.Chat user';
-    throw new Error(`Failed to create Rocket.Chat user: ${errorMsg}`);
+    const errorMsg = createResponse.data?.error || 'Failed to create Rocket.Chat user';
+    throw new Error(errorMsg);
+  } catch (error) {
+    console.error('Error creating Rocket.Chat user:', error.response?.data || error.message);
+    throw new Error(`Failed to create Rocket.Chat user for app user ${appUserId}: ${error.response?.data?.error || error.message}`);
   }
 };
 
-// @desc    Get Rocket.Chat login credentials for current user
 // @route   GET /api/rocketchat/login
+// @desc    Get Rocket.Chat login credentials for current user
 // @access  Private
 exports.getRocketChatLogin = async (req, res) => {
   try {
@@ -231,16 +134,8 @@ exports.getRocketChatLogin = async (req, res) => {
       await loginAsAdmin();
     }
 
-    // Get or create Rocket.Chat user
-    const rcUser = await getOrCreateRocketChatUser(user.email, user.email, user.role);
-
-    // If user exists but we don't have their token, we can't authenticate them
-    // For now, we'll return the user info and the frontend will need to handle login
-    if (!rcUser.authToken) {
-      console.warn(`User ${user.email} exists in RocketChat but no auth token available`);
-      // We'll still return the user info - the frontend can try to open RocketChat
-      // and the user will need to login there
-    }
+    // Get or create Rocket.Chat user (keyed by our Mongo user id)
+    const rcUser = await getOrCreateRocketChatUser(user._id || user.id, user.email, user.role);
 
     res.json({
       serverUrl: ROCKETCHAT_URL,
@@ -254,8 +149,8 @@ exports.getRocketChatLogin = async (req, res) => {
   }
 };
 
-// @desc    Create a direct message channel between patient and clinician
 // @route   POST /api/rocketchat/create-dm
+// @desc    Create or get direct message room between two users
 // @access  Private
 exports.createDirectMessage = async (req, res) => {
   try {
@@ -271,134 +166,134 @@ exports.createDirectMessage = async (req, res) => {
       await loginAsAdmin();
     }
 
-    // Get or create Rocket.Chat users
-    const currentRCUser = await getOrCreateRocketChatUser(
-      currentUser.email,
-      currentUser.email,
-      currentUser.role
-    );
+    // Get or create Rocket.Chat users, keyed by Mongo _id
+    console.log(`Creating/getting RocketChat user for: ${currentUser.email}`);
+    let currentRCUser;
+    try {
+      currentRCUser = await getOrCreateRocketChatUser(
+        currentUser._id || currentUser.id,
+        currentUser.email,
+        currentUser.role
+      );
+      console.log(`✅ Current RC user: ${currentRCUser.username} (${currentRCUser.userId})`);
+    } catch (error) {
+      console.error('Error creating/getting current RC user:', error);
+      return res.status(500).json({ 
+        error: `Failed to setup RocketChat account for ${currentUser.email}: ${error.message}` 
+      });
+    }
 
     const otherUser = await User.findById(otherUserId);
     if (!otherUser) {
       return res.status(404).json({ error: 'Other user not found' });
     }
 
-    const otherRCUser = await getOrCreateRocketChatUser(
-      otherUser.email,
-      otherUser.email,
-      otherUser.role
-    );
-
-    // Create direct message room
-    // If current user doesn't have auth token, we'll use admin to create the room
-    let dmResponse;
-    
-    // Ensure we have valid usernames (not rocket.cat or empty)
-    const currentUsername = currentRCUser.username && currentRCUser.username !== 'rocket.cat' 
-      ? currentRCUser.username 
-      : sanitizeUsername(currentUser.email);
-    const otherUsername = otherRCUser.username && otherRCUser.username !== 'rocket.cat'
-      ? otherRCUser.username
-      : sanitizeUsername(otherUser.email);
-    
-    if (!currentRCUser.authToken) {
-      // Use admin to create a direct message room
-      // First, try to create DM using admin credentials with user IDs
-      try {
-        // Try creating DM using the other user's username
-        dmResponse = await axios.post(
-          `${ROCKETCHAT_URL}/api/v1/im.create`,
-          {
-            username: otherUsername,
-          },
-          {
-            headers: {
-              'X-Auth-Token': adminAuthToken,
-              'X-User-Id': adminUserId,
-            },
-          }
-        );
-        
-        // If that fails, try creating a private group
-        if (!dmResponse.data.success) {
-          // Generate a unique room name
-          const roomName = `dm_${currentUsername}_${otherUsername}`.substring(0, 50); // RocketChat has name length limits
-          
-          dmResponse = await axios.post(
-            `${ROCKETCHAT_URL}/api/v1/groups.create`,
-            {
-              name: roomName,
-              members: [currentUsername, otherUsername],
-              readOnly: false,
-              type: 'p', // private group
-            },
-            {
-              headers: {
-                'X-Auth-Token': adminAuthToken,
-                'X-User-Id': adminUserId,
-              },
-            }
-          );
-          
-          // If group creation fails due to duplicate, try to find existing room
-          if (!dmResponse.data.success && dmResponse.data.errorType === 'error-duplicate-channel-name') {
-            // Try to find the existing room by name
-            const findResponse = await axios.get(
-              `${ROCKETCHAT_URL}/api/v1/groups.info`,
-              {
-                params: { roomName: roomName },
-                headers: {
-                  'X-Auth-Token': adminAuthToken,
-                  'X-User-Id': adminUserId,
-                },
-              }
-            );
-            
-            if (findResponse.data.success && findResponse.data.group) {
-              dmResponse = { data: { success: true, group: findResponse.data.group } };
-            }
-          }
-        }
-      } catch (adminError) {
-        console.error('Error creating DM as admin:', adminError.response?.data || adminError.message);
-        // Return a helpful error message
-        throw new Error(`Failed to create chat room: ${adminError.response?.data?.error || adminError.message}. Please ensure both users exist in RocketChat.`);
-      }
-    } else {
-      // User has auth token, create DM normally
-      dmResponse = await axios.post(
-        `${ROCKETCHAT_URL}/api/v1/im.create`,
-        {
-          username: otherUsername,
-        },
-        {
-          headers: {
-            'X-Auth-Token': currentRCUser.authToken,
-            'X-User-Id': currentRCUser.userId,
-          },
-        }
+    console.log(`Creating/getting RocketChat user for: ${otherUser.email}`);
+    let otherRCUser;
+    try {
+      otherRCUser = await getOrCreateRocketChatUser(
+        otherUser._id || otherUser.id,
+        otherUser.email,
+        otherUser.role
       );
+      console.log(`✅ Other RC user: ${otherRCUser.username} (${otherRCUser.userId})`);
+    } catch (error) {
+      console.error('Error creating/getting other RC user:', error);
+      return res.status(500).json({ 
+        error: `Failed to setup RocketChat account for ${otherUser.email}: ${error.message}` 
+      });
     }
 
-    if (dmResponse.data.success) {
-      // Handle both DM and group responses
-      const room = dmResponse.data.room || dmResponse.data.group;
+    // Create direct message room (logical DM between current user and other user)
+    const currentUsername = currentRCUser.username;
+    const otherUsername = otherRCUser.username;
+    // Sort to ensure the pair is deterministic regardless of who initiates
+    const dmUsernames = [currentUsername, otherUsername].sort();
+
+    // Ensure admin is logged in
+    if (!adminAuthToken) {
+      await loginAsAdmin();
+    }
+
+    const currentHeaders = {
+      'X-Auth-Token': adminAuthToken,
+      'X-User-Id': adminUserId,
+    };
+
+    console.log(
+      `Creating DM room between ${dmUsernames[0]} and ${dmUsernames[1]} (admin call)...`
+    );
+
+    let roomId = null;
+
+    try {
+      // Use Rocket.Chat im.create with both usernames so it's a DM between
+      // the clinician and the patient (not between admin and one user)
+      const dmResponse = await axios.post(
+        `${ROCKETCHAT_URL}/api/v1/im.create`,
+        { usernames: dmUsernames.join(',') },
+        { headers: currentHeaders }
+      );
+
+      if (dmResponse.data.success) {
+        const room = dmResponse.data.room;
+        roomId = room.rid || room._id;
+        console.log(`✅ DM created successfully for users ${dmUsernames.join(', ')}, roomId: ${roomId}`);
+      } else {
+        console.log('im.create did not return success:', dmResponse.data);
+      }
+    } catch (createError) {
+      console.log('DM creation failed, will try to find existing room:', createError.response?.data || createError.message);
+    }
+
+    // If creation failed (likely because room already exists), search for existing DM for this user
+    if (!roomId) {
+      try {
+        console.log(`Searching for existing DM between ${currentUsername} and ${otherUsername}...`);
+        const imListResponse = await axios.get(
+          `${ROCKETCHAT_URL}/api/v1/im.list`,
+          { headers: currentHeaders }
+        );
+
+        if (imListResponse.data.success && imListResponse.data.ims) {
+          const existingDM = imListResponse.data.ims.find((im) => {
+            const usernames = im.usernames || [];
+            return usernames.includes(currentUsername) && usernames.includes(otherUsername);
+          });
+
+          if (existingDM) {
+            roomId = existingDM._id || existingDM.rid;
+            console.log(`✅ Found existing DM, roomId: ${roomId}`);
+          } else {
+            console.log(`No existing DM found between ${currentUsername} and ${otherUsername}`);
+          }
+        }
+      } catch (findError) {
+        console.error('Error finding existing DM:', findError.response?.data || findError.message);
+      }
+    }
+
+    if (roomId) {
+      console.log(`✅ Returning roomId: ${roomId} for users ${currentUsername} and ${otherUsername}`);
       res.json({
-        roomId: room._id,
-        roomName: room.name || room.fname || room.t,
+        roomId: roomId,
+        roomName: roomId, // Use room ID as name for DMs
         serverUrl: ROCKETCHAT_URL,
       });
     } else {
-      throw new Error(dmResponse.data.error || 'Failed to create direct message room');
+      console.error(`❌ Failed to create or find DM room between ${currentUsername} and ${otherUsername}`);
+      return res.status(500).json({ 
+        error: 'Failed to create or find direct message room. Please ensure both users exist in RocketChat and try again.' 
+      });
     }
   } catch (error) {
-    console.error('Error creating direct message:', error.response?.data || error.message);
+    console.error('Error creating direct message:', error);
     res.status(500).json({ error: error.message || 'Failed to create direct message' });
   }
 };
 
-// @desc    Get list of clinicians (for patients) or patients (for clinicians)
 // @route   GET /api/rocketchat/contacts
+// @desc    Get list of contacts (clinicians for patients, patients for clinicians)
 // @access  Private
 exports.getContacts = async (req, res) => {
   try {
@@ -428,6 +323,261 @@ exports.getContacts = async (req, res) => {
   } catch (error) {
     console.error('Error getting contacts:', error);
     res.status(500).json({ error: 'Failed to get contacts' });
+  }
+};
+
+// @route   GET /api/rocketchat/messages/:roomId
+// @desc    Get messages from a RocketChat room
+// @access  Private
+exports.getMessages = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Ensure admin is logged in
+    if (!adminAuthToken) {
+      await loginAsAdmin();
+    }
+
+    // Ensure admin is logged in
+    if (!adminAuthToken) {
+      await loginAsAdmin();
+    }
+
+    const authToken = adminAuthToken;
+    const userId = adminUserId;
+
+    console.log(`Fetching messages for room ${roomId} using admin Rocket.Chat credentials`);
+
+    try {
+      // For direct messages, use im.messages instead of chat.getMessages
+      // Try im.messages first (for direct messages)
+      let messagesResponse;
+      let messages = [];
+      
+      try {
+        messagesResponse = await axios.get(
+          `${ROCKETCHAT_URL}/api/v1/im.messages`,
+          {
+            params: {
+              roomId: roomId,
+              count: 50, // Get last 50 messages
+            },
+            headers: {
+              'X-Auth-Token': authToken,
+              'X-User-Id': userId,
+            },
+          }
+        );
+        
+        if (messagesResponse.data.success && messagesResponse.data.messages) {
+          messages = messagesResponse.data.messages;
+          console.log(`✅ Retrieved ${messages.length} messages using im.messages`);
+        }
+      } catch (imError) {
+        console.log(`im.messages failed, trying chat.getMessages:`, imError.response?.data || imError.message);
+        
+        // Fallback to chat.getMessages
+        try {
+          messagesResponse = await axios.get(
+            `${ROCKETCHAT_URL}/api/v1/chat.getMessages`,
+            {
+              params: {
+                roomId: roomId,
+                count: 50,
+              },
+              headers: {
+                'X-Auth-Token': authToken,
+                'X-User-Id': userId,
+              },
+            }
+          );
+          
+          if (messagesResponse.data.success && messagesResponse.data.messages) {
+            messages = messagesResponse.data.messages;
+            console.log(`✅ Retrieved ${messages.length} messages using chat.getMessages`);
+          }
+        } catch (chatError) {
+          console.error('Both im.messages and chat.getMessages failed:', {
+            imError: imError.response?.data || imError.message,
+            chatError: chatError.response?.data || chatError.message,
+          });
+          throw chatError; // Throw the last error
+        }
+      }
+
+      if (messages.length > 0 || (messagesResponse && messagesResponse.data.success)) {
+        // Format messages for frontend to match Message interface in lib/api/rocketchat.ts
+        const formattedMessages = messages.map((msg) => {
+          const tsValue = msg.ts ? new Date(msg.ts) : new Date();
+          return {
+            _id: msg._id,
+            text: msg.msg || msg.text || '',
+            userId: msg.u?._id || '',
+            username: msg.u?.username || '',
+            name: msg.u?.name || '',
+            timestamp: tsValue.getTime(),
+            createdAt: tsValue.toISOString(),
+          };
+        });
+
+        res.json(formattedMessages.reverse()); // Reverse to show oldest first
+      } else {
+        // No messages yet, return empty array
+        res.json([]);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', {
+        roomId,
+        error: error.response?.data || error.message,
+        status: error.response?.status,
+      });
+      
+      // If 404, the room might not exist or user doesn't have access
+      if (error.response?.status === 404) {
+        return res.status(404).json({ 
+          error: `Room ${roomId} not found or you don't have access. Please try creating the chat again.` 
+        });
+      }
+      
+      return res.status(500).json({ 
+        error: `Failed to get messages: ${error.response?.data?.error || error.message}` 
+      });
+    }
+  } catch (error) {
+    console.error('Error in getMessages:', error);
+    res.status(500).json({ error: error.message || 'Failed to get messages' });
+  }
+};
+
+// @route   POST /api/rocketchat/send-message
+// @desc    Send a message to a RocketChat room
+// @access  Private
+exports.sendMessage = async (req, res) => {
+  try {
+    const { roomId, message } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (!roomId || !message) {
+      return res.status(400).json({ error: 'roomId and message are required' });
+    }
+
+    // Ensure admin is logged in
+    if (!adminAuthToken) {
+      await loginAsAdmin();
+    }
+
+    const authToken = adminAuthToken;
+    const userId = adminUserId;
+
+    try {
+      // Send message to the room
+      // Note: Rocket.Chat's chat.sendMessage expects a "message" object with "rid" and "msg"
+      const sendResponse = await axios.post(
+        `${ROCKETCHAT_URL}/api/v1/chat.sendMessage`,
+        {
+          message: {
+            rid: roomId,
+            msg: message,
+          },
+        },
+        {
+          headers: {
+            'X-Auth-Token': authToken,
+            'X-User-Id': userId,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (sendResponse.data.success) {
+        const msg = sendResponse.data.message;
+        const tsValue = msg.ts ? new Date(msg.ts) : new Date();
+        res.json({
+          _id: msg._id,
+          text: msg.msg,
+          userId: msg.u._id,
+          username: msg.u.username,
+          name: msg.u.name,
+          timestamp: tsValue.getTime(),
+          createdAt: tsValue.toISOString(),
+        });
+      } else {
+        return res.status(500).json({ 
+          error: sendResponse.data.error || 'Failed to send message' 
+        });
+      }
+    } catch (error) {
+      console.error('Error sending message:', error.response?.data || error.message);
+      return res.status(500).json({ 
+        error: `Failed to send message: ${error.response?.data?.error || error.message}` 
+      });
+    }
+  } catch (error) {
+    console.error('Error in sendMessage:', error);
+    res.status(500).json({ error: error.message || 'Failed to send message' });
+  }
+};
+
+// @route   GET /api/rocketchat/unread-count
+// @desc    Get unread message count for current user
+// @access  Private
+exports.getUnreadCount = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Ensure admin is logged in
+    if (!adminAuthToken) {
+      await loginAsAdmin();
+    }
+
+    const authToken = adminAuthToken;
+    const userId = adminUserId;
+
+    try {
+      // Get subscriptions (rooms user is part of) to check unread counts
+      const subscriptionsResponse = await axios.get(
+        `${ROCKETCHAT_URL}/api/v1/subscriptions.get`,
+        {
+          headers: {
+            'X-Auth-Token': authToken,
+            'X-User-Id': userId,
+          },
+        }
+      );
+
+      if (subscriptionsResponse.data.success) {
+        // Calculate total unread count
+        let totalUnread = 0;
+        subscriptionsResponse.data.update.forEach((sub) => {
+          if (sub.unread > 0) {
+            totalUnread += sub.unread;
+          }
+        });
+
+        res.json({ unreadCount: totalUnread });
+      } else {
+        res.json({ unreadCount: 0 });
+      }
+    } catch (error) {
+      console.error('Error getting unread count:', error.response?.data || error.message);
+      res.json({ unreadCount: 0 }); // Return 0 on error to not break UI
+    }
+  } catch (error) {
+    console.error('Error in getUnreadCount:', error);
+    res.json({ unreadCount: 0 });
   }
 };
 

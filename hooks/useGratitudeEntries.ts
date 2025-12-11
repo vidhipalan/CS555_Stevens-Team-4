@@ -1,4 +1,4 @@
-import { createGratitudeEntry, deleteGratitudeEntry, getGratitudeEntries, updateGratitudeEntry } from '@/app/api/gratitude';
+import { createGratitudeEntry, deleteGratitudeEntry, getGratitudeEntries, updateGratitudeEntry } from '@/lib/api/gratitude';
 import { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
 

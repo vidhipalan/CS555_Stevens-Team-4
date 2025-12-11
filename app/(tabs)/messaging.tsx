@@ -1,355 +1,340 @@
-import { createDirectMessage, getContacts, getRocketChatLogin, type Contact } from '@/app/api/rocketchat';
+import { createDirectMessage, getContacts, getMessages, sendMessage, type Contact, type Message } from '@/lib/api/rocketchat';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
-import { openBrowserAsync, WebBrowserPresentationStyle } from 'expo-web-browser';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
-
-// Helper function to safely show alerts
-const showAlert = (title: string, message: string) => {
-  try {
-    // Use a small delay to ensure React has finished any pending updates
-    setTimeout(() => {
-      try {
-        Alert.alert(title, message, [{ text: 'OK' }]);
-      } catch (e) {
-        console.error('Error showing alert:', e);
-      }
-    }, 200);
-  } catch (e) {
-    console.error('Error scheduling alert:', e);
-  }
-};
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 
 export default function MessagingScreen() {
   const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [openingChat, setOpeningChat] = useState<string | null>(null); // Track which contact is being opened
   const [userRole, setUserRole] = useState<string | null>(null);
   const [email, setEmail] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
+  const handleBack = async () => {
+    try {
       const role = await SecureStore.getItemAsync('user_role');
-      const userEmail = await SecureStore.getItemAsync('user_email');
-      setUserRole(role);
-      setEmail(userEmail || '');
-      await fetchContacts();
-    };
-    loadData();
-  }, []);
+      if (role === 'clinician') {
+        router.replace('/(tabs)/dashboard' as any);
+      } else {
+        router.replace('/(tabs)' as any);
+      }
+    } catch (error: any) {
+      console.error('Error in handleBack:', error);
+      router.replace('/(tabs)' as any);
+    }
+  };
 
-  const fetchContacts = async () => {
+  const fetchContacts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const contactsList = await getContacts();
       setContacts(contactsList || []);
+      
+      // If there's only one contact, auto-select it
+      if (contactsList && contactsList.length === 1) {
+        await handleContactSelect(contactsList[0]);
+      }
     } catch (error: any) {
       console.error('Error fetching contacts:', error);
       const errorMsg = error?.message || 'Failed to load contacts';
       setError(errorMsg);
-      showAlert('Error', errorMsg);
+      Alert.alert('Error', errorMsg);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchContacts();
-  };
-
-  const handleContactPress = async (contact: Contact) => {
-    // Prevent multiple simultaneous clicks
-    if (openingChat) {
-      console.log('Already opening a chat, ignoring click');
-      return;
-    }
-    
-    if (!contact || !contact._id) {
-      console.error('Invalid contact:', contact);
-      showAlert('Error', 'Invalid contact information');
-      return;
-    }
-    
-    // Clear any previous errors
-    setError(null);
-    
+  const handleContactSelect = async (contact: Contact) => {
     try {
-      setOpeningChat(contact._id);
-      console.log('Starting chat setup for contact:', contact.email);
+      // When switching contacts, clear previous room + messages first
+      setSelectedContact(contact);
+      setError(null);
+      setRoomId(null);
+      setMessages([]);
       
-      // Get RocketChat login credentials with error handling
-      let loginInfo;
-      try {
-        loginInfo = await getRocketChatLogin();
-        console.log('Got RocketChat login info:', { 
-          serverUrl: loginInfo?.serverUrl, 
-          hasToken: !!loginInfo?.authToken 
-        });
-      } catch (loginError: any) {
-        console.error('Error getting RocketChat login:', loginError);
-        const errorMsg = `Failed to connect to RocketChat: ${loginError?.message || 'Unknown error'}`;
-        setError(errorMsg);
-        showAlert('Error', errorMsg);
-        return;
-      }
+      // Create or get DM room for this specific contact
+      const dmRoom = await createDirectMessage(contact._id);
+      setRoomId(dmRoom.roomId);
       
-      if (!loginInfo || !loginInfo.serverUrl) {
-        const errorMsg = 'Failed to get RocketChat server information';
-        setError(errorMsg);
-        showAlert('Error', errorMsg);
-        return;
-      }
-
-      // Create or get direct message room with error handling
-      let dmRoom;
-      try {
-        dmRoom = await createDirectMessage(contact._id);
-        console.log('Created DM room:', { roomId: dmRoom?.roomId, roomName: dmRoom?.roomName });
-      } catch (dmError: any) {
-        console.error('Error creating DM:', dmError);
-        const errorMsg = `Failed to create chat room: ${dmError?.message || 'Unknown error'}`;
-        setError(errorMsg);
-        showAlert('Error', errorMsg);
-        return;
-      }
-      
-      if (!dmRoom || (!dmRoom.roomName && !dmRoom.roomId)) {
-        const errorMsg = 'Failed to create or find chat room - no room information returned';
-        setError(errorMsg);
-        showAlert('Error', errorMsg);
-        return;
-      }
-
-      // Replace localhost with the local IP address for mobile devices
-      // Extract IP from API_URL (e.g., http://192.168.1.10:5050 -> 192.168.1.10)
-      let serverUrl = loginInfo.serverUrl || 'http://localhost:3000';
-      const apiUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5050';
-      
-      // Ensure serverUrl has protocol
-      if (!serverUrl.startsWith('http://') && !serverUrl.startsWith('https://')) {
-        serverUrl = `http://${serverUrl}`;
-      }
-      
-      // If serverUrl contains localhost, replace it with the IP from API_URL
-      if (serverUrl.includes('localhost') && !apiUrl.includes('localhost')) {
-        try {
-          // Extract IP address and port from API_URL
-          const urlMatch = apiUrl.match(/http:\/\/([^:]+)(?::(\d+))?/);
-          if (urlMatch && urlMatch[1]) {
-            const localIP = urlMatch[1];
-            // Replace localhost with IP, preserving port if present
-            serverUrl = serverUrl.replace(/localhost(?::(\d+))?/, (match, port) => {
-              return port ? `${localIP}:${port}` : `${localIP}:3000`;
-            });
-          }
-        } catch (e) {
-          console.error('Error replacing localhost:', e);
-        }
-      }
-
-      // Construct RocketChat URL - ensure it's a valid URL
-      // RocketChat URL format: http://server/direct/username or http://server/group/roomName
-      let chatUrl;
-      
-      // Remove @ prefix if present (RocketChat usernames might have @)
-      const cleanRoomName = dmRoom.roomName?.replace(/^@/, '') || '';
-      
-      if (cleanRoomName) {
-        // Check if it's a direct message (starts with username) or group (starts with dm_)
-        if (cleanRoomName.startsWith('dm_')) {
-          // It's a group/private room created by admin
-          chatUrl = `${serverUrl}/group/${cleanRoomName}`;
-        } else {
-          // It's a direct message - use the username directly
-          chatUrl = `${serverUrl}/direct/${cleanRoomName}`;
-        }
-        
-        // Add auth token if available (for auto-login)
-        if (loginInfo.authToken) {
-          chatUrl += `?resumeToken=${loginInfo.authToken}`;
-        } else {
-          // If no auth token, add login hint to URL
-          // User will need to log in manually, but we can pre-fill the room
-          console.warn('No auth token available - user will need to log in manually');
-        }
-      } else if (dmRoom.roomId) {
-        // Fallback: use roomId to construct URL
-        // Try to determine if it's a DM or group based on roomId format
-        chatUrl = `${serverUrl}/direct/${dmRoom.roomId}`;
-        if (loginInfo.authToken) {
-          chatUrl += `?resumeToken=${loginInfo.authToken}`;
-        } else {
-          console.warn('No auth token available - user will need to log in manually');
-        }
-      } else {
-        const errorMsg = 'No room information available';
-        setError(errorMsg);
-        showAlert('Error', errorMsg);
-        return;
-      }
-      
-      console.log('Opening RocketChat URL:', chatUrl);
-
-      // Validate URL before opening
-      try {
-        new URL(chatUrl); // This will throw if URL is invalid
-      } catch (urlError) {
-        console.error('Invalid URL constructed:', chatUrl);
-        const errorMsg = `Invalid chat URL: ${chatUrl}`;
-        setError(errorMsg);
-        showAlert('Error', errorMsg);
-        return;
-      }
-
-      // Open in browser with additional safety checks
-      try {
-        console.log('Attempting to open URL:', chatUrl);
-        console.log('Auth token available:', !!loginInfo.authToken);
-        
-        // Double-check URL is valid
-        if (!chatUrl || typeof chatUrl !== 'string') {
-          throw new Error('Invalid URL to open');
-        }
-        
-        if (!chatUrl.startsWith('http://') && !chatUrl.startsWith('https://')) {
-          throw new Error(`URL must start with http:// or https://, got: ${chatUrl}`);
-        }
-        
-        // If no auth token, we'll open RocketChat homepage and let user navigate
-        if (!loginInfo.authToken) {
-          console.warn('Opening RocketChat without auto-login - user will need to log in manually');
-          // Instead of opening the specific room, open the RocketChat homepage
-          // User can log in and then navigate to the room
-          chatUrl = serverUrl; // Just open the RocketChat homepage
-          
-          // Show a helpful message after opening (don't block the browser)
-          setTimeout(() => {
-            showAlert(
-              'Manual Login Required',
-              `Please log in to RocketChat with:\n\nUsername: ${loginInfo.username}\n\nAfter logging in, you can find your chat room in the direct messages.`
-            );
-          }, 1000);
-        }
-        
-        // Open browser with timeout protection
-        const browserPromise = openBrowserAsync(chatUrl, {
-          presentationStyle: WebBrowserPresentationStyle.AUTOMATIC,
-        });
-        
-        // Add timeout to prevent hanging
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Browser open timeout')), 10000);
-        });
-        
-        const result = await Promise.race([browserPromise, timeoutPromise]);
-        console.log('Browser opened successfully:', result);
-      } catch (browserError: any) {
-        console.error('Error opening browser:', browserError);
-        const errorMsg = browserError?.message || browserError?.toString() || 'Unknown error';
-        
-        // Show error safely
-        showAlert(
-          'Cannot Open Chat',
-          `Unable to open RocketChat.\n\nPlease ensure:\n1. RocketChat is running\n2. Your phone and computer are on the same Wi-Fi\n3. RocketChat is accessible\n\nError: ${errorMsg}`
-        );
-      }
+      // Load messages for this room
+      await loadMessages(dmRoom.roomId);
     } catch (error: any) {
-      console.error('Error in handleContactPress:', error);
-      const errorMessage = error?.message || error?.toString() || 'Failed to open chat. Please try again.';
-      setError(errorMessage);
-      
-      // Show error safely - don't throw, just show alert
-      showAlert('Error', errorMessage);
-    } finally {
-      // Always reset opening state after a delay to ensure state updates complete
-      setTimeout(() => {
-        setOpeningChat(null);
-      }, 500);
+      console.error('Error selecting contact:', error);
+      const errorMsg = error?.message || 'Failed to open chat';
+      setError(errorMsg);
+      Alert.alert('Error', errorMsg);
     }
   };
 
-  if (loading) {
+  const loadMessages = async (roomIdToLoad: string) => {
+    try {
+      setLoading(true);
+      const messagesList = await getMessages(roomIdToLoad);
+      setMessages(messagesList || []);
+      
+      // Scroll to bottom after messages load
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (error: any) {
+      console.error('Error loading messages:', error);
+      const errorMsg = error?.message || 'Failed to load messages';
+      setError(errorMsg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !roomId || sending) {
+      return;
+    }
+
+    const textToSend = messageText.trim();
+    setMessageText('');
+    setSending(true);
+
+    try {
+      const newMessage = await sendMessage(roomId, textToSend);
+      setMessages((prev) => [...prev, newMessage]);
+      
+      // Scroll to bottom after sending
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      setMessageText(textToSend); // Restore message on error
+      Alert.alert('Error', error?.message || 'Failed to send message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    if (roomId) {
+      setRefreshing(true);
+      await loadMessages(roomId);
+    } else {
+      await fetchContacts();
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadData = async () => {
+      try {
+        const role = await SecureStore.getItemAsync('user_role');
+        const userEmail = await SecureStore.getItemAsync('user_email');
+        
+        if (!isMounted) return;
+        
+        setUserRole(role);
+        setEmail(userEmail || '');
+        await fetchContacts();
+      } catch (error: any) {
+        if (!isMounted) return;
+        console.error('Error loading messaging data:', error);
+        setError(error?.message || 'Failed to load messaging data');
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchContacts]);
+
+  // Auto-refresh messages every 5 seconds when a room is open
+  useEffect(() => {
+    if (!roomId) return;
+
+    const interval = setInterval(() => {
+      loadMessages(roomId);
+    }, 5000); // Refresh every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [roomId]);
+
+  const formatTime = (timestamp: number | string | undefined | null) => {
+    if (!timestamp) return '';
+
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
+    if (isNaN(date.getTime())) {
+      // If the timestamp is invalid, don't show anything instead of "Invalid Date"
+      return '';
+    }
+
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+    
+    return date.toLocaleDateString();
+  };
+
+  const title = userRole === 'clinician' ? 'Your Patients' : 'Your Clinician';
+
+  // Show contact list if no contact selected
+  if (!selectedContact) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Loading contacts...</Text>
-      </View>
-    );
-  }
-
-  const title = userRole === 'clinician' ? 'Your Patients' : 'Your Clinicians';
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
-        </Pressable>
-        <Text style={styles.title}>{title}</Text>
-      </View>
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle" size={24} color="#FF3B30" />
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={() => setError(null)} style={styles.dismissButton}>
-            <Text style={styles.dismissButtonText}>Dismiss</Text>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={handleBack} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#007AFF" />
           </Pressable>
+          <Text style={styles.title}>{title}</Text>
         </View>
-      )}
 
-      {contacts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="people-outline" size={64} color="#CCCCCC" />
-          <Text style={styles.emptyText}>No contacts available</Text>
-          <Text style={styles.emptySubtext}>
-            {userRole === 'clinician'
-              ? 'You don\'t have any patients assigned yet.'
-              : 'You don\'t have a clinician assigned yet.'}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={contacts}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => {
-            const isOpening = openingChat === item._id;
-            return (
+        {error && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={24} color="#FF3B30" />
+            <Text style={styles.errorText}>{error}</Text>
+            <Pressable onPress={() => setError(null)} style={styles.dismissButton}>
+              <Text style={styles.dismissButtonText}>Dismiss</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" />
+            <Text style={styles.loadingText}>Loading contacts...</Text>
+          </View>
+        ) : contacts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="people-outline" size={64} color="#CCCCCC" />
+            <Text style={styles.emptyText}>No contacts available</Text>
+            <Text style={styles.emptySubtext}>
+              {userRole === 'clinician'
+                ? 'You don\'t have any patients assigned yet.'
+                : 'You don\'t have a clinician assigned yet. Please contact your administrator.'}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={contacts}
+            keyExtractor={(item) => item._id}
+            renderItem={({ item }) => (
               <Pressable
-                style={[styles.contactItem, isOpening && styles.contactItemDisabled]}
-                onPress={() => handleContactPress(item)}
-                disabled={isOpening || !!openingChat}
+                style={styles.contactItem}
+                onPress={() => handleContactSelect(item)}
                 android_ripple={{ color: '#E0E0E0' }}>
                 <View style={styles.contactAvatar}>
                   <Ionicons name="person" size={24} color="#007AFF" />
                 </View>
                 <View style={styles.contactInfo}>
                   <Text style={styles.contactEmail}>{item.email}</Text>
-                  <Text style={styles.contactSubtext}>
-                    {isOpening ? 'Opening chat...' : 'Tap to start chatting'}
+                  <Text style={styles.contactSubtext}>Tap to start chatting</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
+              </Pressable>
+            )}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor="#007AFF"
+              />
+            }
+            contentContainerStyle={styles.listContent}
+          />
+        )}
+      </View>
+    );
+  }
+
+  // Show chat interface when contact is selected
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+      <View style={styles.header}>
+        <Pressable onPress={() => setSelectedContact(null)} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        </Pressable>
+        <View style={styles.headerInfo}>
+          <Text style={styles.title}>{selectedContact.email}</Text>
+          <Text style={styles.subtitle}>Active</Text>
+        </View>
+      </View>
+
+      {loading && messages.length === 0 ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" />
+          <Text style={styles.loadingText}>Loading messages...</Text>
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => {
+            const isCurrentUser = item.userId === email || item.username === email.replace(/[@.]/g, '_');
+            return (
+              <View style={[styles.messageContainer, isCurrentUser && styles.messageContainerRight]}>
+                <View style={[styles.messageBubble, isCurrentUser && styles.messageBubbleRight]}>
+                  <Text style={[styles.messageText, isCurrentUser && styles.messageTextRight]}>
+                    {item.text}
+                  </Text>
+                  <Text style={[styles.messageTime, isCurrentUser && styles.messageTimeRight]}>
+                    {formatTime(item.timestamp || item.createdAt)}
                   </Text>
                 </View>
-                {isOpening ? (
-                  <ActivityIndicator size="small" color="#007AFF" />
-                ) : (
-                  <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
-                )}
-              </Pressable>
+              </View>
             );
           }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={styles.messagesContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#007AFF"
+            />
+          }
         />
       )}
-    </View>
+
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Type a message..."
+          value={messageText}
+          onChangeText={setMessageText}
+          multiline
+          maxLength={1000}
+        />
+        <Pressable
+          style={[styles.sendButton, (!messageText.trim() || sending) && styles.sendButtonDisabled]}
+          onPress={handleSendMessage}
+          disabled={!messageText.trim() || sending}>
+          {sending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="send" size={20} color="#fff" />
+          )}
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -357,17 +342,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666666',
   },
   header: {
     flexDirection: 'row',
@@ -384,9 +358,27 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1A1A1A',
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666666',
   },
   listContent: {
     padding: 16,
@@ -403,9 +395,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
-  },
-  contactItemDisabled: {
-    opacity: 0.6,
   },
   contactAvatar: {
     width: 48,
@@ -472,6 +461,75 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontSize: 14,
     fontWeight: '600',
+  },
+  messagesContent: {
+    padding: 16,
+  },
+  messageContainer: {
+    marginBottom: 12,
+    alignItems: 'flex-start',
+  },
+  messageContainerRight: {
+    alignItems: 'flex-end',
+  },
+  messageBubble: {
+    maxWidth: '75%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  messageBubbleRight: {
+    backgroundColor: '#007AFF',
+  },
+  messageText: {
+    fontSize: 16,
+    color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  messageTextRight: {
+    color: '#FFFFFF',
+  },
+  messageTime: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  messageTimeRight: {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 8,
+    maxHeight: 100,
+    fontSize: 16,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#CCCCCC',
   },
 });
 

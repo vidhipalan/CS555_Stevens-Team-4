@@ -1,6 +1,11 @@
+import { useAuthToken } from '@/hooks/useAuthToken';
+import { useAutosave } from '@/hooks/useAutosave';
+import { useGratitudeEditor } from '@/hooks/useGratitudeEditor';
+import { useGratitudeEntries } from '@/hooks/useGratitudeEntries';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -11,10 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useAuthToken } from '@/hooks/useAuthToken';
-import { useGratitudeEntries } from '@/hooks/useGratitudeEntries';
-import { useAutosave } from '@/hooks/useAutosave';
-import { useGratitudeEditor } from '@/hooks/useGratitudeEditor';
 
 interface GratitudeEntry {
   _id: string;
@@ -47,11 +48,12 @@ export default function GratitudeJournal() {
 
   // Extract concern 3: Autosave logic
   const { triggerAutosave, cancelAutosave } = useAutosave(
-    async (data) => {
+    async (data: Partial<GratitudeEntry>) => {
       if (data.content && data.content.trim().length > 10 && token) {
         await saveEntry({
           ...data,
           isDraft: true,
+          date: selectedDate, // Ensure autosave also uses current date
         });
       }
     },
@@ -92,7 +94,33 @@ export default function GratitudeJournal() {
   // Cancel autosave when saving manually
   const handleManualSave = async (isDraft = false) => {
     cancelAutosave();
-    await handleSaveEntry(isDraft);
+    
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(selectedDate)) {
+      Alert.alert('Invalid Date', 'Please enter a valid date in YYYY-MM-DD format (e.g., 2024-01-15)');
+      return;
+    }
+    
+    // Validate the date is actually valid (e.g., not 2024-13-45)
+    const dateObj = new Date(selectedDate);
+    if (isNaN(dateObj.getTime())) {
+      Alert.alert('Invalid Date', 'Please enter a valid date');
+      return;
+    }
+    
+    // Pass the current selectedDate directly to ensure we use the latest value
+    // This ensures the date from the input field is used, not a stale closure value
+    const entryData = {
+      title: newEntry.title || 'Untitled Entry',
+      content: newEntry.content || 'No content provided',
+      isDraft,
+      date: selectedDate, // Use current selectedDate from the input field
+    };
+    const success = await saveEntry(entryData, editingEntry?._id);
+    if (success) {
+      closeEditor();
+    }
   };
 
   const handleEditEntry = (entry: GratitudeEntry) => {
@@ -100,11 +128,16 @@ export default function GratitudeJournal() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    // Parse the date and use UTC methods to avoid timezone conversion issues
+    const date = new Date(dateString);
+    // Use UTC methods to get the date components without timezone conversion
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const day = date.getUTCDate();
+    
+    // Format as "Nov 8, 2025" using UTC date
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${monthNames[month]} ${day}, ${year}`;
   };
 
   const getMoodEmoji = (mood?: string) => {
@@ -180,7 +213,41 @@ export default function GratitudeJournal() {
         />
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => openEditor()}
+          onPress={() => {
+            // Validate date format before opening editor
+            const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+            if (!dateRegex.test(selectedDate)) {
+              Alert.alert('Invalid Date Format', 'Please enter a valid date in YYYY-MM-DD format (e.g., 2025-11-08)');
+              return;
+            }
+            
+            // Validate the date is actually valid (e.g., not 2025-13-45)
+            const dateObj = new Date(selectedDate);
+            if (isNaN(dateObj.getTime())) {
+              Alert.alert('Invalid Date', 'Please enter a valid date');
+              return;
+            }
+            
+            // Additional validation: check if month and day are in valid ranges
+            const [year, month, day] = selectedDate.split('-').map(Number);
+            if (month < 1 || month > 12) {
+              Alert.alert('Invalid Date', 'Month must be between 01 and 12');
+              return;
+            }
+            if (day < 1 || day > 31) {
+              Alert.alert('Invalid Date', 'Day must be between 01 and 31');
+              return;
+            }
+            
+            // Check if the day is valid for the given month
+            const daysInMonth = new Date(year, month, 0).getDate();
+            if (day > daysInMonth) {
+              Alert.alert('Invalid Date', `The selected month only has ${daysInMonth} days`);
+              return;
+            }
+            
+            openEditor();
+          }}
         >
           <Ionicons name="add" size={24} color="white" />
         </TouchableOpacity>

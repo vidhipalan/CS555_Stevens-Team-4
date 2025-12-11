@@ -39,7 +39,8 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/withAllowScreenRecording"
     ],
     "experiments": {
       "typedRoutes": true,

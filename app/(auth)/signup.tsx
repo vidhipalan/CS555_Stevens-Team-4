@@ -1,5 +1,4 @@
 // app/(auth)/signup.tsx
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { API_ENDPOINTS } from '@/constants/config';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Picker } from '@react-native-picker/picker';
@@ -18,7 +17,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export default function Signup() {
-  const [secure, setSecure] = useState(true);
+  // secure state removed - secureTextEntry disabled for demo screen recording
   const [serverError, setServerError] = useState<string | null>(null);
   const { register, setValue, handleSubmit, formState: { errors, isSubmitting, isValid } } =
     useForm<FormValues>({
@@ -105,16 +104,14 @@ export default function Signup() {
             <Text style={styles.label}>Password</Text>
             <View style={styles.passwordContainer}>
               <TextInput
-                secureTextEntry={secure}
+                secureTextEntry={false}
                 placeholder="Create a password (min. 6 characters)"
                 placeholderTextColor="#9CA3AF"
                 style={[styles.input, styles.passwordInput]}
                 onChangeText={(t) => setValue('password', t, { shouldValidate: true })}
                 {...register('password')}
               />
-              <Pressable onPress={() => setSecure(s => !s)} style={styles.toggle}>
-                <IconSymbol name={secure ? 'eye' : 'eye.slash'} size={20} color="#6B7280" />
-              </Pressable>
+              {/* Eye icon removed - secureTextEntry disabled for demo screen recording */}
             </View>
             {errors.password && <Text style={styles.error}>{errors.password.message}</Text>}
           </View>
@@ -256,16 +253,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   passwordInput: {
-    paddingRight: 50,
-  },
-  toggle: {
-    position: 'absolute',
-    right: 16,
-    top: 14,
-    padding: 4,
-  },
-  toggleText: {
-    fontSize: 20,
+    // paddingRight removed - no eye icon needed (secureTextEntry disabled for demo)
   },
   error: {
     color: '#EF4444',
